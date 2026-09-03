@@ -52,7 +52,7 @@ export const otpService = {
       if (data.tokenHash) {
         const { error } = await supabase.auth.verifyOtp({
           token_hash: data.tokenHash,
-          type: "magiclink"
+          type: "email"
         });
         if (error) return { success: false, error: "Could not establish session" };
       }

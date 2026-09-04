@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, MessageCircle } from "lucide-react";
+import { CheckCircle2, MessageCircle, Copy } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -9,11 +9,13 @@ import { otpService } from "../../services/otpService";
 import { orderService } from "../../services/orderService";
 import { isNonEmpty, isValidBangladeshiMobile } from "../../utils/validation";
 import { money, formatDate } from "../../utils/format";
-import type { Order } from "../../types";
+import type { Order, PaymentMethod } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
+const BKASH_NUMBER = "01880176772";
+const NAGAD_NUMBER = "01856191004";
 
 function buildOrderWhatsappMessage(order: Order): string {
   const lines: string[] = [];
@@ -63,11 +65,16 @@ export default function Checkout() {
   const [area, setArea] = useState("");
   const [city, setCity] = useState("Dhaka");
   const [landmark, setLandmark] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bkash");
+  const [paymentReference, setPaymentReference] = useState("");
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const [clientToken] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const deliveryCharge = /dhaka/i.test(city) ? 60 : 120;
   const total = subtotal + deliveryCharge;
+  const payNumber = paymentMethod === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
+  const referenceReady = paymentReference.trim().length >= 4;
 
   async function handleSendOtp() {
     if (!isNonEmpty(name)) return showToast(t("yourName"), "error");
@@ -90,8 +97,21 @@ export default function Checkout() {
     setStep("address");
   }
 
+  function copyNumber() {
+    navigator.clipboard?.writeText(payNumber);
+    showToast(lang === "en" ? "Number copied" : "নম্বর কপি হয়েছে", "success");
+  }
+
   async function handleConfirmOrder() {
     if (!isNonEmpty(fullAddress) || !isNonEmpty(city)) return showToast(t("deliveryAddress"), "error");
+    if (!referenceReady) {
+      return showToast(
+        lang === "en"
+          ? "Please pay the delivery charge and enter the Transaction ID"
+          : "দয়া করে ডেলিভারি চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
+        "error"
+      );
+    }
     setStep("placing");
     setPlaceError(null);
     const res = await orderService.createOrder({
@@ -100,7 +120,9 @@ export default function Checkout() {
       area,
       city,
       landmark,
-      paymentMethod: "cod"
+      paymentMethod,
+      paymentReference: paymentReference.trim(),
+      clientToken
     });
     if (!res.success || !res.order) {
       setPlaceError(res.error || t("error"));
@@ -222,47 +244,17 @@ export default function Checkout() {
             <input value={landmark} onChange={(e) => setLandmark(e.target.value)} className="input" />
           </Field>
 
-          <div className="text-xs font-bold text-mute uppercase pt-2">{t("paymentMethod")}</div>
-          <div className="bg-teal-tint rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-teal-dark">{t("cod")}</span>
-            <CheckCircle2 className="text-teal" size={18} />
-          </div>
-          <div className="text-[11px] text-mute">{t("codNote")}</div>
-
-          <div className="bg-white border border-border rounded-2xl p-4 space-y-2 mt-2">
+          <div className="bg-white border border-border rounded-2xl p-4 space-y-2">
             <div className="text-xs font-bold text-mute uppercase mb-1">{t("orderSummary")}</div>
             <Row label={t("subtotal")} value={money(subtotal)} />
             <Row label={t("delivery")} value={money(deliveryCharge)} />
             <Row label={t("total")} value={money(total)} bold />
           </div>
 
-          <button
-            onClick={handleConfirmOrder}
-            disabled={step === "placing"}
-            className="press w-full bg-orange text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
-          >
-            {step === "placing" ? t("placingOrder") : t("confirmOrder")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="text-xs font-bold text-mute mb-1.5 block">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className="flex justify-between">
-      <span className={`text-sm ${bold ? "font-extrabold text-ink" : "text-mute"}`}>{label}</span>
-      <span className={`text-sm ${bold ? "font-extrabold text-teal-dark" : "text-ink"}`}>{value}</span>
-    </div>
-  );
-}
+          <div className="text-xs font-bold text-mute uppercase pt-1">
+            {lang === "en" ? "Pay Delivery Charge First" : "প্রথমে ডেলিভারি চার্জ পরিশোধ করুন"}
+          </div>
+          <div className="text-[11px] text-mute -mt-2">
+            {lang === "en"
+              ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order."
+              : "পণ্যের দাম ক্যাশ অন ডেলিভারিতে দেবেন। শুধু নিচের ডেলিভারি চার্জটা অর্ডার নিশ্চিত কর

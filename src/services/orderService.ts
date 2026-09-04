@@ -9,7 +9,9 @@ export const orderService = {
     city: string;
     landmark?: string;
     paymentMethod: PaymentMethod;
+    paymentReference?: string;
     couponCode?: string;
+    clientToken?: string;
   }) {
     const {
       data: { session }
@@ -33,7 +35,9 @@ export const orderService = {
         city: params.city,
         landmark: params.landmark,
         paymentMethod: params.paymentMethod,
-        couponCode: params.couponCode
+        paymentReference: params.paymentReference,
+        couponCode: params.couponCode,
+        clientToken: params.clientToken
       })
     });
     const data = await res.json();
@@ -55,7 +59,7 @@ export const orderService = {
       .from("orders")
       .update({ status: "cancelled", cancel_reason: reason })
       .eq("id", orderId)
-      .eq("status", "pending"); // customers may only cancel while still pending
+      .eq("status", "pending");
     if (error) throw error;
   }
 };

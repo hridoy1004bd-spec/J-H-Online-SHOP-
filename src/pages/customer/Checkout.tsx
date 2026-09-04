@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, MessageCircle } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -12,6 +12,39 @@ import { money, formatDate } from "../../utils/format";
 import type { Order } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
+
+// Admin's WhatsApp number, kept in one place so it's easy to change later.
+const ADMIN_WHATSAPP_NUMBER = "8801856191004";
+
+function buildOrderWhatsappMessage(order: Order): string {
+  const lines: string[] = [];
+  lines.push("J H Online SHOP - New Order");
+  lines.push("-----------------------------");
+  lines.push(`Order ID: ${order.order_number}`);
+  lines.push(`Name: ${order.customer_name ?? ""}`);
+  lines.push(`Phone: ${order.customer_mobile ?? ""}`);
+  lines.push(`Address: ${order.full_address ?? ""}`);
+  if (order.area) lines.push(`Area: ${order.area}`);
+  if (order.city) lines.push(`City: ${order.city}`);
+  if (order.landmark) lines.push(`Landmark: ${order.landmark}`);
+  lines.push("");
+  lines.push("Products:");
+  (order.order_items ?? []).forEach((it: any) => {
+    const parts = [it.product_name ?? it.product_name_snapshot ?? "Product"];
+    if (it.size) parts.push(`Size: ${it.size}`);
+    if (it.color) parts.push(`Color: ${it.color}`);
+    parts.push(`Qty: ${it.quantity}`);
+    parts.push(`Price: ৳${it.unit_price ?? it.price_snapshot ?? ""}`);
+    lines.push(`- ${parts.join(" | ")}`);
+  });
+  lines.push("");
+  lines.push(`Subtotal: ৳${order.subtotal}`);
+  lines.push(`Delivery Charge: ৳${order.delivery_charge}`);
+  lines.push(`Total: ৳${order.total}`);
+  lines.push(`Payment Method: ${order.payment_method ?? "cod"}`);
+  lines.push(`Order Date: ${order.created_at ?? ""}`);
+  return lines.join("\n");
+}
 
 export default function Checkout() {
   const { items, subtotal, clear } = useCart();
@@ -81,6 +114,10 @@ export default function Checkout() {
   }
 
   if (step === "success" && placedOrder) {
+    const whatsappHref = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+      buildOrderWhatsappMessage(placedOrder)
+    )}`;
+
     return (
       <div className="flex flex-col items-center text-center px-8 pt-16">
         <div className="w-16 h-16 rounded-full bg-teal-tint flex items-center justify-center mb-4">
@@ -93,7 +130,18 @@ export default function Checkout() {
           <Row label={t("orderDate")} value={formatDate(placedOrder.created_at, lang)} />
           <Row label={t("orderTotal")} value={money(placedOrder.total)} bold />
         </div>
-        <div className="flex gap-3 w-full mt-6">
+
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noreferrer"
+          className="press w-full mt-4 bg-[#25D366] text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+        >
+          <MessageCircle size={18} />
+          {lang === "en" ? "Share order on WhatsApp" : "WhatsApp-এ অর্ডারটি শেয়ার করুন"}
+        </a>
+
+        <div className="flex gap-3 w-full mt-3">
           <button onClick={() => navigate("/orders")} className="press flex-1 bg-teal text-white text-sm font-bold py-3 rounded-xl">
             {t("trackOrder")}
           </button>
@@ -157,65 +205,4 @@ export default function Checkout() {
 
       {(step === "address" || step === "placing") && (
         <div className="px-4 space-y-4">
-          {placeError && <div className="text-xs bg-red-50 text-red-600 font-semibold rounded-lg px-3 py-2">{placeError}</div>}
-
-          <div className="text-xs font-bold text-mute uppercase">{t("deliveryAddress")}</div>
-          <Field label={t("fullAddress")}>
-            <input value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="input" />
-          </Field>
-          <div className="flex gap-3">
-            <Field label={t("area")} className="flex-1">
-              <input value={area} onChange={(e) => setArea(e.target.value)} className="input" />
-            </Field>
-            <Field label={t("city")} className="flex-1">
-              <input value={city} onChange={(e) => setCity(e.target.value)} className="input" />
-            </Field>
-          </div>
-          <Field label={t("landmark")}>
-            <input value={landmark} onChange={(e) => setLandmark(e.target.value)} className="input" />
-          </Field>
-
-          <div className="text-xs font-bold text-mute uppercase pt-2">{t("paymentMethod")}</div>
-          <div className="bg-teal-tint rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-teal-dark">{t("cod")}</span>
-            <CheckCircle2 className="text-teal" size={18} />
-          </div>
-          <div className="text-[11px] text-mute">{t("codNote")}</div>
-
-          <div className="bg-white border border-border rounded-2xl p-4 space-y-2 mt-2">
-            <div className="text-xs font-bold text-mute uppercase mb-1">{t("orderSummary")}</div>
-            <Row label={t("subtotal")} value={money(subtotal)} />
-            <Row label={t("delivery")} value={money(deliveryCharge)} />
-            <Row label={t("total")} value={money(total)} bold />
-          </div>
-
-          <button
-            onClick={handleConfirmOrder}
-            disabled={step === "placing"}
-            className="press w-full bg-orange text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
-          >
-            {step === "placing" ? t("placingOrder") : t("confirmOrder")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="text-xs font-bold text-mute mb-1.5 block">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className="flex justify-between">
-      <span className={`text-sm ${bold ? "font-extrabold text-ink" : "text-mute"}`}>{label}</span>
-      <span className={`text-sm ${bold ? "font-extrabold text-teal-dark" : "text-ink"}`}>{value}</span>
-    </div>
-  );
-}
+          {placeError && 

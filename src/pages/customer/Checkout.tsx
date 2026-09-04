@@ -13,7 +13,6 @@ import type { Order } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
 
-// Admin's WhatsApp number, kept in one place so it's easy to change later.
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 
 function buildOrderWhatsappMessage(order: Order): string {
@@ -205,4 +204,65 @@ export default function Checkout() {
 
       {(step === "address" || step === "placing") && (
         <div className="px-4 space-y-4">
-          {placeError && 
+          {placeError && <div className="text-xs bg-red-50 text-red-600 font-semibold rounded-lg px-3 py-2">{placeError}</div>}
+
+          <div className="text-xs font-bold text-mute uppercase">{t("deliveryAddress")}</div>
+          <Field label={t("fullAddress")}>
+            <input value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="input" />
+          </Field>
+          <div className="flex gap-3">
+            <Field label={t("area")} className="flex-1">
+              <input value={area} onChange={(e) => setArea(e.target.value)} className="input" />
+            </Field>
+            <Field label={t("city")} className="flex-1">
+              <input value={city} onChange={(e) => setCity(e.target.value)} className="input" />
+            </Field>
+          </div>
+          <Field label={t("landmark")}>
+            <input value={landmark} onChange={(e) => setLandmark(e.target.value)} className="input" />
+          </Field>
+
+          <div className="text-xs font-bold text-mute uppercase pt-2">{t("paymentMethod")}</div>
+          <div className="bg-teal-tint rounded-xl p-3 flex items-center justify-between">
+            <span className="text-sm font-bold text-teal-dark">{t("cod")}</span>
+            <CheckCircle2 className="text-teal" size={18} />
+          </div>
+          <div className="text-[11px] text-mute">{t("codNote")}</div>
+
+          <div className="bg-white border border-border rounded-2xl p-4 space-y-2 mt-2">
+            <div className="text-xs font-bold text-mute uppercase mb-1">{t("orderSummary")}</div>
+            <Row label={t("subtotal")} value={money(subtotal)} />
+            <Row label={t("delivery")} value={money(deliveryCharge)} />
+            <Row label={t("total")} value={money(total)} bold />
+          </div>
+
+          <button
+            onClick={handleConfirmOrder}
+            disabled={step === "placing"}
+            className="press w-full bg-orange text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
+          >
+            {step === "placing" ? t("placingOrder") : t("confirmOrder")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-bold text-mute mb-1.5 block">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className={`text-sm ${bold ? "font-extrabold text-ink" : "text-mute"}`}>{label}</span>
+      <span className={`text-sm ${bold ? "font-extrabold text-teal-dark" : "text-ink"}`}>{value}</span>
+    </div>
+  );
+}

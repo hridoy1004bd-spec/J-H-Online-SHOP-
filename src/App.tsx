@@ -24,6 +24,8 @@ import Balance from "./pages/admin/Balance";
 import PaymentSettings from "./pages/admin/PaymentSettings";
 import Settings from "./pages/admin/Settings";
 import Support from "./pages/admin/Support";
+import Banners from "./pages/admin/Banners";
+import Notices from "./pages/admin/Notices";
 
 export default function App() {
   return (
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="payments" element={<PaymentSettings />} />
         <Route path="settings" element={<Settings />} />
         <Route path="support" element={<Support />} />
+        <Route path="banners" element={<Banners />} />
+        <Route path="notices" element={<Notices />} />
       </Route>
     </Routes>
   );

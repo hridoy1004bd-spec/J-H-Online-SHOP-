@@ -28,10 +28,10 @@ export default function NoticeTicker() {
   const text = notices.map((n) => (lang === "en" ? n.text_en : n.text_bn)).join("     •     ");
 
   return (
-    <div className="mx-4 mt-3 bg-orange-tint border border-orange/20 rounded-xl flex items-center gap-2 px-3 py-2 overflow-hidden">
+    <div className="mx-4 mt-3 bg-orange-tint border border-orange/20 rounded-xl flex items-center gap-2 px-3 py-2 overflow-hidden max-w-full">
       <Megaphone size={14} className="text-orange shrink-0" />
-      <div className="overflow-hidden whitespace-nowrap flex-1">
-        <div className="inline-block pl-full" style={{ animation: "jh-marquee 18s linear infinite" }}>
+      <div className="overflow-hidden whitespace-nowrap flex-1 min-w-0">
+        <div className="inline-block" style={{ animation: "jh-marquee 18s linear infinite" }}>
           {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
         </div>
       </div>

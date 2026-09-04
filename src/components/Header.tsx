@@ -1,14 +1,34 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, User, ShoppingCart, ShoppingBag } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCart } from "../contexts/CartContext";
+import { supabase } from "../lib/supabase";
 
 export default function Header() {
   const { t, lang, setLang } = useLanguage();
   const { itemCount } = useCart();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [storeName, setStoreName] = useState("J H Online SHOP");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from("store_settings")
+      .select("store_name, logo_url")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (!active || !data) return;
+        if (data.store_name) setStoreName(data.store_name);
+        if (data.logo_url) setLogoUrl(data.logo_url);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -19,10 +39,14 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-teal text-white">
       <div className="flex items-center gap-3 px-4 py-3">
         <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
-            <ShoppingBag size={17} />
+          <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center overflow-hidden shrink-0">
+            {logoUrl ? (
+              <img src={logoUrl} alt={storeName} className="w-full h-full object-cover" />
+            ) : (
+              <ShoppingBag size={17} />
+            )}
           </div>
-          <span className="font-extrabold text-sm leading-tight hidden xs:block">{t("appName")}</span>
+          <span className="font-extrabold text-sm leading-tight block">{storeName || t("appName")}</span>
         </div>
 
         <form onSubmit={submitSearch} className="flex-1 flex items-center bg-white/15 rounded-full px-3 py-2">

@@ -11,6 +11,8 @@ import {
   CreditCard,
   Settings as SettingsIcon,
   MessageCircle,
+  Image,
+  Megaphone,
   Menu,
   X,
   LogOut
@@ -37,7 +39,9 @@ export default function AdminLayout() {
     { to: "/admin/balance", icon: Wallet, label: t("balance") },
     { to: "/admin/payments", icon: CreditCard, label: t("paymentSettings") },
     { to: "/admin/settings", icon: SettingsIcon, label: t("storeSettings") },
-    { to: "/admin/support", icon: MessageCircle, label: t("support") }
+    { to: "/admin/support", icon: MessageCircle, label: t("support") },
+    { to: "/admin/banners", icon: Image, label: lang === "en" ? "Banners" : "ব্যানার" },
+    { to: "/admin/notices", icon: Megaphone, label: lang === "en" ? "Notices" : "নোটিশ" }
   ];
 
   return (

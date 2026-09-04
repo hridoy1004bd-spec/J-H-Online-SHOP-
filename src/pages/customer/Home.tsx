@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Sparkles } from "lucide-react";
 import { productService } from "../../services/productService";
 import ProductCard from "../../components/ProductCard";
 import CategoryMenu from "../../components/CategoryMenu";
+import BannerSlider from "../../components/BannerSlider";
+import NoticeTicker from "../../components/NoticeTicker";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { ErrorState } from "../../components/EmptyState";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -27,7 +27,6 @@ function Section({ title, products }: { title: string; products: Product[] }) {
 
 export default function Home() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -69,21 +68,8 @@ export default function Home() {
 
   return (
     <div className="pb-4">
-      {/* Hero banner */}
-      <div className="mx-4 mt-4 rounded-2xl bg-gradient-to-br from-teal to-teal-dark text-white p-5 flex items-center justify-between overflow-hidden relative">
-        <div>
-          <div className="flex items-center gap-1.5 text-orange-200 text-xs font-bold mb-1">
-            <Sparkles size={13} /> {t("offers")}
-          </div>
-          <div className="font-extrabold text-lg leading-snug">{t("discountProducts")}</div>
-          <button
-            onClick={() => navigate("/categories")}
-            className="press mt-3 bg-orange text-white text-xs font-bold px-4 py-2 rounded-full"
-          >
-            {t("home")} →
-          </button>
-        </div>
-      </div>
+      <BannerSlider />
+      <NoticeTicker />
 
       <CategoryMenu categories={categories} activeId={activeCategory} onSelect={setActiveCategory} />
 

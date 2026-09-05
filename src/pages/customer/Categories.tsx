@@ -7,7 +7,7 @@ import type { Category, Product } from "../../types";
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeIds, setActiveIds] = useState<string[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,14 +18,14 @@ export default function Categories() {
   useEffect(() => {
     setLoading(true);
     productService
-      .list({ categoryId: activeId ?? undefined, pageSize: 40 })
+      .list({ categoryId: activeIds ?? undefined, pageSize: 40 })
       .then((r) => setProducts(r.products))
       .finally(() => setLoading(false));
-  }, [activeId]);
+  }, [activeIds]);
 
   return (
     <div className="pt-2">
-      <CategoryMenu categories={categories} activeId={activeId} onSelect={setActiveId} />
+      <CategoryMenu categories={categories} activeIds={activeIds} onSelect={setActiveIds} />
       {loading ? (
         <ProductGridSkeleton count={8} />
       ) : (

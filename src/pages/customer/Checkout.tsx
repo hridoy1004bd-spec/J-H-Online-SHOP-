@@ -99,7 +99,7 @@ export default function Checkout() {
 
   function copyNumber() {
     navigator.clipboard?.writeText(payNumber);
-    showToast(lang === "en" ? "Number copied" : "নম্বর কপি হয়েছে", "success");
+    showToast(lang === "en" ? "Number copied" : "নমর কপি হয়েছে", "success");
   }
 
   async function handleConfirmOrder() {
@@ -108,7 +108,7 @@ export default function Checkout() {
       showToast(
         lang === "en"
           ? "Please pay the delivery charge and enter the Transaction ID"
-          : "দয়া কর ডেলিভার চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
+          : "দয করে ডেলিভারি চর পঠিয়ে ট্রানজকশন আইডি দিন",
         "error"
       );
       return;
@@ -145,8 +145,14 @@ export default function Checkout() {
         <div className="w-16 h-16 rounded-full bg-teal-tint flex items-center justify-center mb-4">
           <CheckCircle2 className="text-teal" size={32} />
         </div>
-        <div className="font-extrabold text-lg mb-1">{t("orderPlaced")}</div>
-        <div className="text-mute text-sm mb-6">{t("orderPlacedSub")}</div>
+        <div className="font-extrabold text-lg mb-1">
+          {lang === "en" ? "Order placed successfully!" : "🎉 অর্ডার সফলভাবে সম্পন্ন হয়েছে!"}
+        </div>
+        <div className="text-mute text-sm mb-6 whitespace-pre-line">
+          {lang === "en"
+            ? "Dear customer, we've received your order. Take a screenshot of your order and send it to us via the WhatsApp button below — we'll confirm it quickly once we see it. Thank you for shopping with us."
+            : "প্রিয় গহক, আপনার অর্ডরটি আমরা সফলভাবে পয়েছি। আপনার পছন্দের পণ্টর সনশট নিয়ে নচের WhatsApp বাটন কক করে আমদের কাছে পঠিয়ে দিন। আপনার পঠানো স্নশট দখে আমরা দত আপনর পণ্যট নশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
+        </div>
         <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
           <Row label={t("orderId")} value={placedOrder.order_number} />
           <Row label={t("orderDate")} value={formatDate(placedOrder.created_at, lang)} />
@@ -258,7 +264,7 @@ export default function Checkout() {
           <div className="text-[11px] text-mute -mt-2">
             {lang === "en"
               ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order."
-              : "পণ্যের দাম ক্যশ অন ডেলিভারতে দেবন। শুধু নিচর ডেলিভার চার্জট অর্ডার নশ্চিত করত আগ পাঠাতে হবে।"}
+              : "পণ্যের দাম ক্যাশ অন ডেলিভারিতে দবন। শধু নিচের ডেলভারি চার্জটা অর্ডার নশ্চিত করতে আগ পাঠাত হবে।"}
           </div>
 
           <div className="flex gap-2">
@@ -268,7 +274,7 @@ export default function Checkout() {
                 paymentMethod === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
               }`}
             >
-              {t("bkash")}
+              {lang === "en" ? "bKash" : "বিকশ"}
             </button>
             <button
               onClick={() => setPaymentMethod("nagad")}
@@ -276,7 +282,7 @@ export default function Checkout() {
                 paymentMethod === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
               }`}
             >
-              {t("nagad")}
+              {lang === "en" ? "Nagad" : "নগদ"}
             </button>
           </div>
 
@@ -295,7 +301,7 @@ export default function Checkout() {
             </div>
           </div>
 
-          <Field label={t("transactionRef")}>
+          <Field label={lang === "en" ? "Transaction ID" : "ট্রানজেকশন আইডি"}>
             <input
               value={paymentReference}
               onChange={(e) => setPaymentReference(e.target.value)}

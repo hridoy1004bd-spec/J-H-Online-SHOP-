@@ -35,13 +35,13 @@ function buildOrderWhatsappMessage(order: Order): string {
     if (it.size) parts.push(`Size: ${it.size}`);
     if (it.color) parts.push(`Color: ${it.color}`);
     parts.push(`Qty: ${it.quantity}`);
-    parts.push(`Price: ৳${it.unit_price ?? it.price_snapshot ?? ""}`);
+    parts.push(`Price: TK ${it.unit_price ?? it.price_snapshot ?? ""}`);
     lines.push(`- ${parts.join(" | ")}`);
   });
   lines.push("");
-  lines.push(`Subtotal: ৳${order.subtotal}`);
-  lines.push(`Delivery Charge: ৳${order.delivery_charge}`);
-  lines.push(`Total: ৳${order.total}`);
+  lines.push(`Subtotal: TK ${order.subtotal}`);
+  lines.push(`Delivery Charge: TK ${order.delivery_charge}`);
+  lines.push(`Total: TK ${order.total}`);
   lines.push(`Payment Method: ${order.payment_method ?? "cod"}`);
   lines.push(`Order Date: ${order.created_at ?? ""}`);
   return lines.join("\n");
@@ -105,12 +105,13 @@ export default function Checkout() {
   async function handleConfirmOrder() {
     if (!isNonEmpty(fullAddress) || !isNonEmpty(city)) return showToast(t("deliveryAddress"), "error");
     if (!referenceReady) {
-      return showToast(
+      showToast(
         lang === "en"
           ? "Please pay the delivery charge and enter the Transaction ID"
           : "দয়া করে ডেলিভারি চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
+      return;
     }
     setStep("placing");
     setPlaceError(null);
@@ -133,37 +134,3 @@ export default function Checkout() {
     clear();
     setStep("success");
   }
-
-  if (step === "success" && placedOrder) {
-    const whatsappHref = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(
-      buildOrderWhatsappMessage(placedOrder)
-    )}`;
-
-    return (
-      <div className="flex flex-col items-center text-center px-8 pt-16">
-        <div className="w-16 h-16 rounded-full bg-teal-tint flex items-center justify-center mb-4">
-          <CheckCircle2 className="text-teal" size={32} />
-        </div>
-        <div className="font-extrabold text-lg mb-1">{t("orderPlaced")}</div>
-        <div className="text-mute text-sm mb-6">{t("orderPlacedSub")}</div>
-        <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
-          <Row label={t("orderId")} value={placedOrder.order_number} />
-          <Row label={t("orderDate")} value={formatDate(placedOrder.created_at, lang)} />
-          <Row label={t("orderTotal")} value={money(placedOrder.total)} bold />
-        </div>
-
-        <a
-          href={whatsappHref}
-          target="_blank"
-          rel="noreferrer"
-          className="press w-full mt-4 bg-[#25D366] text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-        >
-          <MessageCircle size={18} />
-          {lang === "en" ? "Share order on WhatsApp" : "WhatsApp-এ অর্ডারটি শেয়ার করুন"}
-        </a>
-
-        <div className="flex gap-3 w-full mt-3">
-          <button onClick={() => navigate("/orders")} className="press flex-1 bg-teal text-white text-sm font-bold py-3 rounded-xl">
-            {t("trackOrder")}
-          </button>
-          <button onClick={() => navigate("/")} className="press flex-1 bg-teal-tint text-teal-dark text-sm font

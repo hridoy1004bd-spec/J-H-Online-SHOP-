@@ -10,7 +10,7 @@ const PRODUCT_SELECT = `
 
 export const productService = {
   async list(opts: {
-    categoryId?: string;
+    categoryId?: string | string[];
     featured?: boolean;
     newArrivals?: boolean;
     bestSeller?: boolean;
@@ -22,7 +22,13 @@ export const productService = {
     const { page = 1, pageSize = 20 } = opts;
     let query = supabase.from("products").select(PRODUCT_SELECT, { count: "exact" }).eq("is_active", true);
 
-    if (opts.categoryId) query = query.eq("category_id", opts.categoryId);
+    if (opts.categoryId) {
+      if (Array.isArray(opts.categoryId)) {
+        if (opts.categoryId.length > 0) query = query.in("category_id", opts.categoryId);
+      } else {
+        query = query.eq("category_id", opts.categoryId);
+      }
+    }
     if (opts.featured) query = query.eq("is_featured", true);
     if (opts.newArrivals) query = query.eq("is_new_arrival", true);
     if (opts.bestSeller) query = query.eq("is_best_seller", true);
@@ -76,7 +82,6 @@ export const productService = {
 export function stockForVariant(product: Product, variantId: string | null): number {
   const row = product.inventory?.find((i) => i.variant_id === variantId);
   if (row) return Math.max(0, row.quantity - row.reserved);
-  // No variants at all — sum every inventory row for the product.
   const total = (product.inventory ?? []).reduce((s, i) => s + Math.max(0, i.quantity - i.reserved), 0);
   return total;
 }

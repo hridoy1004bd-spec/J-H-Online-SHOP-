@@ -28,7 +28,7 @@ function Section({ title, products }: { title: string; products: Product[] }) {
 export default function Home() {
   const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategoryIds, setActiveCategoryIds] = useState<string[] | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
@@ -42,7 +42,7 @@ export default function Home() {
     try {
       const [cats, general, arrivals, best, feat] = await Promise.all([
         productService.listCategories(),
-        productService.list({ categoryId: activeCategory ?? undefined, pageSize: 12 }),
+        productService.list({ categoryId: activeCategoryIds ?? undefined, pageSize: 12 }),
         productService.list({ newArrivals: true, pageSize: 8 }),
         productService.list({ bestSeller: true, pageSize: 8 }),
         productService.list({ featured: true, pageSize: 8 })
@@ -62,7 +62,7 @@ export default function Home() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory]);
+  }, [activeCategoryIds]);
 
   if (error) return <ErrorState onRetry={load} />;
 
@@ -71,16 +71,16 @@ export default function Home() {
       <BannerSlider />
       <NoticeTicker />
 
-      <CategoryMenu categories={categories} activeId={activeCategory} onSelect={setActiveCategory} />
+      <CategoryMenu categories={categories} activeIds={activeCategoryIds} onSelect={setActiveCategoryIds} />
 
       {loading ? (
         <ProductGridSkeleton count={8} />
       ) : (
         <>
-          <Section title={t("featured")} products={featured} />
-          <Section title={t("newArrivals")} products={newArrivals} />
-          <Section title={t("bestSelling")} products={bestSellers} />
-          <Section title={activeCategory ? t("all") : t("recommended")} products={allProducts} />
+          {activeCategoryIds === null && <Section title={t("featured")} products={featured} />}
+          {activeCategoryIds === null && <Section title={t("newArrivals")} products={newArrivals} />}
+          {activeCategoryIds === null && <Section title={t("bestSelling")} products={bestSellers} />}
+          <Section title={activeCategoryIds ? t("all") : t("recommended")} products={allProducts} />
         </>
       )}
     </div>

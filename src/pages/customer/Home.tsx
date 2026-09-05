@@ -3,6 +3,7 @@ import { productService } from "../../services/productService";
 import ProductCard from "../../components/ProductCard";
 import CategoryMenu from "../../components/CategoryMenu";
 import BannerSlider from "../../components/BannerSlider";
+import FeaturedBannerSlider from "../../components/FeaturedBannerSlider";
 import NoticeTicker from "../../components/NoticeTicker";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { ErrorState } from "../../components/EmptyState";
@@ -28,7 +29,7 @@ function Section({ title, products }: { title: string; products: Product[] }) {
 export default function Home() {
   const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategoryIds, setActiveCategoryIds] = useState<string[] | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
@@ -42,7 +43,7 @@ export default function Home() {
     try {
       const [cats, general, arrivals, best, feat] = await Promise.all([
         productService.listCategories(),
-        productService.list({ categoryId: activeCategoryIds ?? undefined, pageSize: 12 }),
+        productService.list({ categoryId: activeCategory ?? undefined, pageSize: 12 }),
         productService.list({ newArrivals: true, pageSize: 8 }),
         productService.list({ bestSeller: true, pageSize: 8 }),
         productService.list({ featured: true, pageSize: 8 })
@@ -62,7 +63,7 @@ export default function Home() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryIds]);
+  }, [activeCategory]);
 
   if (error) return <ErrorState onRetry={load} />;
 
@@ -70,17 +71,18 @@ export default function Home() {
     <div className="pb-4">
       <BannerSlider />
       <NoticeTicker />
+      <FeaturedBannerSlider />
 
-      <CategoryMenu categories={categories} activeIds={activeCategoryIds} onSelect={setActiveCategoryIds} />
+      <CategoryMenu categories={categories} activeId={activeCategory} onSelect={setActiveCategory} />
 
       {loading ? (
         <ProductGridSkeleton count={8} />
       ) : (
         <>
-          {activeCategoryIds === null && <Section title={t("featured")} products={featured} />}
-          {activeCategoryIds === null && <Section title={t("newArrivals")} products={newArrivals} />}
-          {activeCategoryIds === null && <Section title={t("bestSelling")} products={bestSellers} />}
-          <Section title={activeCategoryIds ? t("all") : t("recommended")} products={allProducts} />
+          <Section title={t("featured")} products={featured} />
+          <Section title={t("newArrivals")} products={newArrivals} />
+          <Section title={t("bestSelling")} products={bestSellers} />
+          <Section title={activeCategory ? t("all") : t("recommended")} products={allProducts} />
         </>
       )}
     </div>

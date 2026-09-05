@@ -108,7 +108,7 @@ export default function Checkout() {
       showToast(
         lang === "en"
           ? "Please pay the delivery charge and enter the Transaction ID"
-          : "দয়া করে ডেলিভারি চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
+          : "দয়া কর ডেলিভার চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
       return;
@@ -134,3 +134,203 @@ export default function Checkout() {
     clear();
     setStep("success");
   }
+
+  if (step === "success" && placedOrder) {
+    const whatsappHref = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+      buildOrderWhatsappMessage(placedOrder)
+    )}`;
+
+    return (
+      <div className="flex flex-col items-center text-center px-8 pt-16">
+        <div className="w-16 h-16 rounded-full bg-teal-tint flex items-center justify-center mb-4">
+          <CheckCircle2 className="text-teal" size={32} />
+        </div>
+        <div className="font-extrabold text-lg mb-1">{t("orderPlaced")}</div>
+        <div className="text-mute text-sm mb-6">{t("orderPlacedSub")}</div>
+        <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
+          <Row label={t("orderId")} value={placedOrder.order_number} />
+          <Row label={t("orderDate")} value={formatDate(placedOrder.created_at, lang)} />
+          <Row label={t("orderTotal")} value={money(placedOrder.total)} bold />
+        </div>
+
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noreferrer"
+          className="press w-full mt-4 bg-[#25D366] text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+        >
+          <MessageCircle size={18} />
+          {lang === "en" ? "Share order on WhatsApp" : "WhatsApp-এ অর্ডারটি শেয়ার করুন"}
+        </a>
+
+        <div className="flex gap-3 w-full mt-3">
+          <button onClick={() => navigate("/orders")} className="press flex-1 bg-teal text-white text-sm font-bold py-3 rounded-xl">
+            {t("trackOrder")}
+          </button>
+          <button onClick={() => navigate("/")} className="press flex-1 bg-teal-tint text-teal-dark text-sm font-bold py-3 rounded-xl">
+            {t("backHome")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-36">
+      <h1 className="px-4 pt-4 pb-3 font-extrabold text-lg">{t("checkoutTitle")}</h1>
+
+      {step === "identify" && (
+        <div className="px-4 space-y-4">
+          <Field label={t("yourName")}>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} className="input" />
+          </Field>
+          <Field label={t("mobileNumber")}>
+            <input
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+              placeholder={t("mobilePh")}
+              maxLength={11}
+              className="input"
+            />
+          </Field>
+          <button onClick={handleSendOtp} disabled={sending} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
+            {sending ? t("loading") : t("sendOtp")}
+          </button>
+        </div>
+      )}
+
+      {step === "otp" && (
+        <div className="px-4 space-y-4">
+          <div className="text-sm text-mute">{t("enterOtp")} — {mobile}</div>
+          {devOtpHint && (
+            <div className="text-xs bg-orange-tint text-orange font-bold rounded-lg px-3 py-2">
+              {t("devOtpNote")}: {devOtpHint}
+            </div>
+          )}
+          <input
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+            maxLength={4}
+            inputMode="numeric"
+            className="input text-center text-2xl tracking-[0.5em] font-bold"
+            placeholder="****"
+          />
+          <button onClick={handleVerifyOtp} disabled={sending || otp.length < 4} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
+            {sending ? t("loading") : t("verify")}
+          </button>
+          <div className="flex justify-between text-xs">
+            <button onClick={() => setStep("identify")} className="text-mute font-semibold">{t("changeNumber")}</button>
+            <button onClick={handleSendOtp} className="text-teal font-semibold">{t("resend")}</button>
+          </div>
+        </div>
+      )}
+
+      {(step === "address" || step === "placing") && (
+        <div className="px-4 space-y-4">
+          {placeError && <div className="text-xs bg-red-50 text-red-600 font-semibold rounded-lg px-3 py-2">{placeError}</div>}
+
+          <div className="text-xs font-bold text-mute uppercase">{t("deliveryAddress")}</div>
+          <Field label={t("fullAddress")}>
+            <input value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="input" />
+          </Field>
+          <div className="flex gap-3">
+            <Field label={t("area")} className="flex-1">
+              <input value={area} onChange={(e) => setArea(e.target.value)} className="input" />
+            </Field>
+            <Field label={t("city")} className="flex-1">
+              <input value={city} onChange={(e) => setCity(e.target.value)} className="input" />
+            </Field>
+          </div>
+          <Field label={t("landmark")}>
+            <input value={landmark} onChange={(e) => setLandmark(e.target.value)} className="input" />
+          </Field>
+
+          <div className="bg-white border border-border rounded-2xl p-4 space-y-2">
+            <div className="text-xs font-bold text-mute uppercase mb-1">{t("orderSummary")}</div>
+            <Row label={t("subtotal")} value={money(subtotal)} />
+            <Row label={t("delivery")} value={money(deliveryCharge)} />
+            <Row label={t("total")} value={money(total)} bold />
+          </div>
+
+          <div className="text-xs font-bold text-mute uppercase pt-1">
+            {lang === "en" ? "Pay Delivery Charge First" : "প্রথমে ডেলিভারি চার্জ পরিশোধ করুন"}
+          </div>
+          <div className="text-[11px] text-mute -mt-2">
+            {lang === "en"
+              ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order."
+              : "পণ্যের দাম ক্যশ অন ডেলিভারতে দেবন। শুধু নিচর ডেলিভার চার্জট অর্ডার নশ্চিত করত আগ পাঠাতে হবে।"}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPaymentMethod("bkash")}
+              className={`press flex-1 text-sm font-bold py-2.5 rounded-xl border ${
+                paymentMethod === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
+              }`}
+            >
+              {t("bkash")}
+            </button>
+            <button
+              onClick={() => setPaymentMethod("nagad")}
+              className={`press flex-1 text-sm font-bold py-2.5 rounded-xl border ${
+                paymentMethod === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
+              }`}
+            >
+              {t("nagad")}
+            </button>
+          </div>
+
+          <div className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
+            <div className="text-xs text-mute">
+              {lang === "en" ? "Send the delivery charge to:" : "ডেলিভারি চার্জ এই নম্বরে পাঠান:"}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-lg text-ink tracking-wide">{payNumber}</span>
+              <button onClick={copyNumber} className="press flex items-center gap-1 text-xs font-bold text-teal-dark bg-white px-3 py-1.5 rounded-full">
+                <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
+              </button>
+            </div>
+            <div className="text-sm font-bold text-ink">
+              {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(deliveryCharge)}
+            </div>
+          </div>
+
+          <Field label={t("transactionRef")}>
+            <input
+              value={paymentReference}
+              onChange={(e) => setPaymentReference(e.target.value)}
+              placeholder={lang === "en" ? "e.g. 8N7A6B5C4D" : "যেমন: 8N7A6B5C4D"}
+              className="input"
+            />
+          </Field>
+
+          <button
+            onClick={handleConfirmOrder}
+            disabled={step === "placing" || !referenceReady}
+            className="press w-full bg-orange text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
+          >
+            {step === "placing" ? t("placingOrder") : t("confirmOrder")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-bold text-mute mb-1.5 block">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className={`text-sm ${bold ? "font-extrabold text-ink" : "text-mute"}`}>{label}</span>
+      <span className={`text-sm ${bold ? "font-extrabold text-teal-dark" : "text-ink"}`}>{value}</span>
+    </div>
+  );
+}

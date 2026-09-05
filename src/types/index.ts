@@ -13,6 +13,7 @@ export type PaymentMethod = "cod" | "bkash" | "nagad" | "rocket" | "card";
 
 export interface Category {
   id: string;
+  parent_id: string | null;
   slug: string;
   name_en: string;
   name_bn: string;

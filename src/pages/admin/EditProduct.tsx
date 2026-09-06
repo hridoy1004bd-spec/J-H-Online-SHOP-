@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X, Upload } from "lucide-react";
+import { X, Upload, Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { uploadService } from "../../services/uploadService";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
 import type { Category, Product } from "../../types";
+
+interface VariantRow {
+  id: string | null;
+  size: string;
+  color: string;
+  quantity: number;
+  inventoryId: string | null;
+  isNew?: boolean;
+}
 
 export default function EditProduct() {
   const { id } = useParams<{ id: string }>();
@@ -27,25 +36,48 @@ export default function EditProduct() {
   const [isActive, setIsActive] = useState(true);
   const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
 
-  useEffect(() => {
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [variantSaving, setVariantSaving] = useState(false);
+
+  async function loadAll() {
     if (!id) return;
-    Promise.all([
-      supabase.from("products").select("*, product_images(*)").eq("id", id).single(),
+    const [{ data: p }, { data: cats }] = await Promise.all([
+      supabase
+        .from("products")
+        .select("*, product_images(*), product_variants(*, inventory(*))")
+        .eq("id", id)
+        .single(),
       supabase.from("categories").select("*").eq("is_active", true).order("sort_order")
-    ]).then(([{ data: p }, { data: cats }]) => {
-      if (p) {
-        setProduct(p as unknown as Product);
-        setNameEn(p.name_en);
-        setNameBn(p.name_bn);
-        setDesc(p.description_en ?? "");
-        setCategoryId(p.category_id ?? "");
-        setOldPrice(String(p.old_price));
-        setPrice(String(p.current_price));
-        setIsActive(p.is_active);
-      }
-      setCategories((cats as Category[]) ?? []);
-      setLoading(false);
-    });
+    ]);
+    if (p) {
+      setProduct(p as unknown as Product);
+      setNameEn(p.name_en);
+      setNameBn(p.name_bn);
+      setDesc(p.description_en ?? "");
+      setCategoryId(p.category_id ?? "");
+      setOldPrice(String(p.old_price));
+      setPrice(String(p.current_price));
+      setIsActive(p.is_active);
+
+      const vRows: VariantRow[] = ((p as any).product_variants ?? []).map((v: any) => {
+        const inv = (v.inventory ?? [])[0];
+        return {
+          id: v.id,
+          size: v.size ?? "",
+          color: v.color ?? "",
+          quantity: inv ? Math.max(0, inv.quantity - inv.reserved) : 0,
+          inventoryId: inv?.id ?? null
+        };
+      });
+      setVariants(vRows);
+    }
+    setCategories((cats as Category[]) ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   function handleFiles(fileList: FileList | null) {
@@ -104,7 +136,75 @@ export default function EditProduct() {
     setProduct((p) => (p ? { ...p, product_images: p.product_images?.filter((i) => i.id !== imageId) } : p));
   }
 
+  function addVariantRow() {
+    setVariants((v) => [...v, { id: null, size: "", color: "", quantity: 0, inventoryId: null, isNew: true }]);
+  }
+
+  function updateVariantRow(idx: number, patch: Partial<VariantRow>) {
+    setVariants((v) => v.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  }
+
+  async function saveVariantRow(idx: number) {
+    if (!id) return;
+    const row = variants[idx];
+    setVariantSaving(true);
+    try {
+      let variantId = row.id;
+      if (!variantId) {
+        const { data, error } = await supabase
+          .from("product_variants")
+          .insert({ product_id: id, size: row.size || null, color: row.color || null })
+          .select()
+          .single();
+        if (error) throw error;
+        variantId = data.id;
+      } else {
+        const { error } = await supabase
+          .from("product_variants")
+          .update({ size: row.size || null, color: row.color || null })
+          .eq("id", variantId);
+        if (error) throw error;
+      }
+
+      if (row.inventoryId) {
+        const { error } = await supabase
+          .from("inventory")
+          .update({ quantity: row.quantity, reserved: 0 })
+          .eq("id", row.inventoryId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("inventory")
+          .insert({ product_id: id, variant_id: variantId, quantity: row.quantity, reserved: 0 })
+          .select()
+          .single();
+        if (error) throw error;
+        updateVariantRow(idx, { inventoryId: data.id });
+      }
+
+      updateVariantRow(idx, { id: variantId, isNew: false });
+      showToast(lang === "en" ? "Variant saved" : "ভ্যারিয়েন্ট সেভ হয়েছে", "success");
+    } catch (err: any) {
+      showToast(err.message || t("error"), "error");
+    } finally {
+      setVariantSaving(false);
+    }
+  }
+
+  async function deleteVariantRow(idx: number) {
+    const row = variants[idx];
+    if (row.id) {
+      if (!confirm(lang === "en" ? "Delete this variant?" : "এই ভ্যারিয়েন্টটি মুছে ফেলতে চান?")) return;
+      await supabase.from("inventory").delete().eq("product_id", id);
+      await supabase.from("product_variants").delete().eq("id", row.id);
+    }
+    setVariants((v) => v.filter((_, i) => i !== idx));
+  }
+
   if (loading || !product) return <div className="text-sm text-mute">{t("loading")}</div>;
+
+  const topCats = categories.filter((c) => !(c as any).parent_id);
+  const childCats = (parentId: string) => categories.filter((c) => (c as any).parent_id === parentId);
 
   return (
     <div className="max-w-xl">
@@ -145,10 +245,16 @@ export default function EditProduct() {
       <Field label={t("category")}>
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
           <option value="">—</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {lang === "bn" ? c.name_bn : c.name_en}
-            </option>
+          {topCats.map((c) => (
+            <React.Fragment key={c.id}>
+              <option value={c.id}>{lang === "bn" ? c.name_bn : c.name_en}</option>
+              {childCats(c.id).map((child) => (
+                <option key={child.id} value={child.id}>
+                  {"— "}
+                  {lang === "bn" ? child.name_bn : child.name_en}
+                </option>
+              ))}
+            </React.Fragment>
           ))}
         </select>
       </Field>
@@ -166,9 +272,61 @@ export default function EditProduct() {
         <span className="text-sm font-semibold">{t("activeProducts")}</span>
       </label>
 
-      <button onClick={save} disabled={saving} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
+      <button onClick={save} disabled={saving} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60 mb-8">
         {saving ? t("loading") : t("save")}
       </button>
+
+      <div className="border-t border-border pt-5">
+        <div className="text-sm font-extrabold mb-1">
+          {lang === "en" ? "Size / Color / Stock" : "সাইজ / কালার / স্টক"}
+        </div>
+        <div className="text-xs text-mute mb-3">
+          {lang === "en" ? "Add sizes and colors, set stock for each." : "সাইজ ও কালার যোগ করুন, প্রতিটার স্টক বসান।"}
+        </div>
+
+        <div className="space-y-2 mb-3">
+          {variants.map((row, idx) => (
+            <div key={idx} className="bg-white border border-border rounded-xl p-3 flex items-center gap-2">
+              <input
+                value={row.size}
+                onChange={(e) => updateVariantRow(idx, { size: e.target.value })}
+                placeholder={lang === "en" ? "Size" : "সাইজ"}
+                className="input flex-1 min-w-0"
+              />
+              <input
+                value={row.color}
+                onChange={(e) => updateVariantRow(idx, { color: e.target.value })}
+                placeholder={lang === "en" ? "Color" : "কালার"}
+                className="input flex-1 min-w-0"
+              />
+              <input
+                type="number"
+                value={row.quantity}
+                onChange={(e) => updateVariantRow(idx, { quantity: Math.max(0, Number(e.target.value)) })}
+                placeholder={lang === "en" ? "Stock" : "স্টক"}
+                className="input w-20"
+              />
+              <button
+                onClick={() => saveVariantRow(idx)}
+                disabled={variantSaving}
+                className="press bg-teal text-white text-xs font-bold px-3 py-2 rounded-lg shrink-0 disabled:opacity-60"
+              >
+                {t("save")}
+              </button>
+              <button onClick={() => deleteVariantRow(idx)} className="press text-red-600 shrink-0">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={addVariantRow}
+          className="press flex items-center justify-center gap-2 w-full bg-teal-tint text-teal-dark text-sm font-bold py-2.5 rounded-xl"
+        >
+          <Plus size={15} /> {lang === "en" ? "Add Size/Color" : "নতুন সাইজ/কালার যোগ করুন"}
+        </button>
+      </div>
     </div>
   );
 }

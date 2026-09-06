@@ -223,7 +223,9 @@ export default function ProductDetails() {
             <RotateCcw size={16} className="text-orange shrink-0 mt-0.5" />
             <div className="text-xs text-ink/80">
               <div className="font-bold mb-0.5">{t("returnPolicy")}</div>
-              {lang === "bn" ? "পণ্যে ত্রুটি থাকলে সহজ ৩ দিনের এক্সচেঞ্জ।" : "Easy 3-day exchange if the product has a defect."}
+              {lang === "bn"
+                ? "ডেলিভারি ম্যান থাকা অবস্থাতেই পণ্য চেক করে নিন। ডেলিভারি ম্যান চলে যাওয়ার পর কোনো রিটার্ন/এক্সচেঞ্জ গ্রহণযোগ্য হবে না।"
+                : "Please check the product while the delivery man is still present. No return/exchange will be accepted after the delivery man has left."}
             </div>
           </div>
         </div>

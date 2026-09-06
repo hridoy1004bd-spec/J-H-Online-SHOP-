@@ -3,6 +3,7 @@ import { productService } from "../../services/productService";
 import ProductCard from "../../components/ProductCard";
 import CategoryMenu from "../../components/CategoryMenu";
 import BannerSlider from "../../components/BannerSlider";
+import FeaturedBannerSlider from "../../components/FeaturedBannerSlider";
 import NoticeTicker from "../../components/NoticeTicker";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { ErrorState } from "../../components/EmptyState";
@@ -70,6 +71,7 @@ export default function Home() {
     <div className="pb-4">
       <BannerSlider />
       <NoticeTicker />
+      <FeaturedBannerSlider />
 
       <CategoryMenu categories={categories} activeIds={activeIds} onSelect={setActiveIds} />
 

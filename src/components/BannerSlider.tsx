@@ -24,7 +24,7 @@ export default function BannerSlider() {
 
   useEffect(() => {
     if (banners.length < 2) return;
-    const id = setInterval(() => setIdx((i) => (i + 1) % banners.length), 4000);
+    const id = setInterval(() => setIdx((i) => (i + 1) % banners.length), 1500);
     return () => clearInterval(id);
   }, [banners.length]);
 

@@ -41,7 +41,8 @@ export default function AdminLayout() {
     { to: "/admin/settings", icon: SettingsIcon, label: t("storeSettings") },
     { to: "/admin/support", icon: MessageCircle, label: t("support") },
     { to: "/admin/banners", icon: Image, label: lang === "en" ? "Banners" : "ব্যানার" },
-    { to: "/admin/notices", icon: Megaphone, label: lang === "en" ? "Notices" : "নোটিশ" }
+    { to: "/admin/notices", icon: Megaphone, label: lang === "en" ? "Notices" : "নোটিশ" },
+    { to: "/admin/featured-banners", icon: Image, label: lang === "en" ? "Featured Banner" : "ফিচার্ড ব্যানার" }
   ];
 
   return (

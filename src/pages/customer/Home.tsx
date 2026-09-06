@@ -5,6 +5,7 @@ import CategoryMenu from "../../components/CategoryMenu";
 import BannerSlider from "../../components/BannerSlider";
 import FeaturedBannerSlider from "../../components/FeaturedBannerSlider";
 import NoticeTicker from "../../components/NoticeTicker";
+import RecentOrderNotice from "../../components/RecentOrderNotice";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { ErrorState } from "../../components/EmptyState";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -72,6 +73,7 @@ export default function Home() {
       <BannerSlider />
       <NoticeTicker />
       <FeaturedBannerSlider />
+      <RecentOrderNotice />
 
       <CategoryMenu categories={categories} activeIds={activeIds} onSelect={setActiveIds} />
 

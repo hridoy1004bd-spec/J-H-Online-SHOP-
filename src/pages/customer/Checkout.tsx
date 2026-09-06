@@ -99,7 +99,7 @@ export default function Checkout() {
 
   function copyNumber() {
     navigator.clipboard?.writeText(payNumber);
-    showToast(lang === "en" ? "Number copied" : "নমর কপি হয়েছে", "success");
+    showToast(lang === "en" ? "Number copied" : "নম্বর কপি হয়েছে", "success");
   }
 
   async function handleConfirmOrder() {
@@ -108,7 +108,7 @@ export default function Checkout() {
       showToast(
         lang === "en"
           ? "Please pay the delivery charge and enter the Transaction ID"
-          : "দয করে ডেলিভারি চর পঠিয়ে ট্রানজকশন আইডি দিন",
+          : "দয়া করে ডেলিভারি চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
       return;
@@ -151,7 +151,7 @@ export default function Checkout() {
         <div className="text-mute text-sm mb-6 whitespace-pre-line">
           {lang === "en"
             ? "Dear customer, we've received your order. Take a screenshot of your order and send it to us via the WhatsApp button below — we'll confirm it quickly once we see it. Thank you for shopping with us."
-            : "প্রিয় গহক, আপনার অর্ডরটি আমরা সফলভাবে পয়েছি। আপনার পছন্দের পণ্টর সনশট নিয়ে নচের WhatsApp বাটন কক করে আমদের কাছে পঠিয়ে দিন। আপনার পঠানো স্নশট দখে আমরা দত আপনর পণ্যট নশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
+            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির স্ক্রিনশট নিয়ে নিচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দ্রুত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
         </div>
         <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
           <Row label={t("orderId")} value={placedOrder.order_number} />
@@ -256,6 +256,20 @@ export default function Checkout() {
             <Row label={t("subtotal")} value={money(subtotal)} />
             <Row label={t("delivery")} value={money(deliveryCharge)} />
             <Row label={t("total")} value={money(total)} bold />
+            <div className="pt-2 mt-2 border-t border-border space-y-1">
+              <div className="flex justify-between">
+                <span className="text-xs font-bold text-orange">
+                  {lang === "en" ? "Pay now (delivery charge)" : "এখনই পাঠাতে হবে (ডেলিভারি চার্জ)"}
+                </span>
+                <span className="text-xs font-extrabold text-orange">{money(deliveryCharge)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs font-bold text-teal-dark">
+                  {lang === "en" ? "Pay to delivery man (product price)" : "ডেলিভারি ম্যানকে ক্যাশে দিতে হবে (পণ্যের দাম)"}
+                </span>
+                <span className="text-xs font-extrabold text-teal-dark">{money(subtotal)}</span>
+              </div>
+            </div>
           </div>
 
           <div className="text-xs font-bold text-mute uppercase pt-1">
@@ -264,7 +278,7 @@ export default function Checkout() {
           <div className="text-[11px] text-mute -mt-2">
             {lang === "en"
               ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order."
-              : "পণ্যের দাম ক্যাশ অন ডেলিভারিতে দবন। শধু নিচের ডেলভারি চার্জটা অর্ডার নশ্চিত করতে আগ পাঠাত হবে।"}
+              : "পণ্যের দাম ক্যাশ অন ডেলিভারিতে দেবেন। শুধু নিচের ডেলিভারি চার্জটা অর্ডার নিশ্চিত করতে আগে পাঠাতে হবে।"}
           </div>
 
           <div className="flex gap-2">
@@ -274,7 +288,7 @@ export default function Checkout() {
                 paymentMethod === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
               }`}
             >
-              {lang === "en" ? "bKash" : "বিকশ"}
+              {lang === "en" ? "bKash" : "বিকাশ"}
             </button>
             <button
               onClick={() => setPaymentMethod("nagad")}

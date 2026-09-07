@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X, Upload, Plus, Trash2 } from "lucide-react";
+import { X, Upload, Plus, Trash2, Copy, Link as LinkIcon } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { uploadService } from "../../services/uploadService";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -38,6 +38,8 @@ export default function EditProduct() {
 
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const [variantSaving, setVariantSaving] = useState(false);
+
+  const productPath = id ? `/product/${id}` : "";
 
   async function loadAll() {
     if (!id) return;
@@ -79,6 +81,11 @@ export default function EditProduct() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  function copyProductLink() {
+    navigator.clipboard?.writeText(productPath);
+    showToast(lang === "en" ? "Product link copied" : "প্রোডাক্ট লিংক কপি হয়েছে", "success");
+  }
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return;
@@ -194,7 +201,7 @@ export default function EditProduct() {
   async function deleteVariantRow(idx: number) {
     const row = variants[idx];
     if (row.id) {
-      if (!confirm(lang === "en" ? "Delete this variant?" : "এই ভ্যারিয়েন্টটি মুছে ফেলতে চান?")) return;
+      if (!confirm(lang === "en" ? "Delete this variant?" : "এই ভ্যারিয়েন্টটি মুছে ফেলতে চন?")) return;
       await supabase.from("inventory").delete().eq("product_id", id);
       await supabase.from("product_variants").delete().eq("id", row.id);
     }
@@ -209,6 +216,19 @@ export default function EditProduct() {
   return (
     <div className="max-w-xl">
       <h1 className="font-extrabold text-lg mb-4">{t("edit")}</h1>
+
+      <div className="bg-teal-tint border border-teal/20 rounded-xl p-3 mb-4">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-teal-dark mb-1.5">
+          <LinkIcon size={13} />
+          {lang === "en" ? "Product Link (paste this in Banners)" : "প্রোডাক্ট লিংক (ব্যানারে এটা বসান)"}
+        </div>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 min-w-0 truncate text-xs bg-white rounded-lg px-2.5 py-2 border border-border">{productPath}</code>
+          <button onClick={copyProductLink} className="press bg-teal text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 shrink-0">
+            <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
+          </button>
+        </div>
+      </div>
 
       <div className="flex gap-2 flex-wrap mb-4">
         {product.product_images?.map((img) => (

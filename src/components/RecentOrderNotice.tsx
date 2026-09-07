@@ -29,14 +29,12 @@ export default function RecentOrderNotice() {
 
   useEffect(() => {
     if (rows.length === 0) return;
-    let showTimer: ReturnType<typeof setTimeout>;
     let hideTimer: ReturnType<typeof setTimeout>;
-    let cycleTimer: ReturnType<typeof setInterval>;
 
     setVisible(true);
     hideTimer = setTimeout(() => setVisible(false), 4500);
 
-    cycleTimer = setInterval(() => {
+    const cycleTimer = setInterval(() => {
       setIdx((i) => (i + 1) % rows.length);
       setVisible(true);
       clearTimeout(hideTimer);
@@ -44,7 +42,6 @@ export default function RecentOrderNotice() {
     }, 7000);
 
     return () => {
-      clearTimeout(showTimer);
       clearTimeout(hideTimer);
       clearInterval(cycleTimer);
     };

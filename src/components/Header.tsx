@@ -38,7 +38,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-teal text-white overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-3 max-w-full">
-        <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer shrink-0 min-w-0 max-w-[92px]">
+        <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer shrink-0 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
               <img src={logoUrl} alt={storeName} className="w-full h-full object-cover" />
@@ -46,22 +46,22 @@ export default function Header() {
               <ShoppingBag size={17} />
             )}
           </div>
-          <span className="font-extrabold text-[11.5px] leading-tight truncate">{storeName || t("appName")}</span>
+          <span className="font-extrabold text-[12px] leading-tight whitespace-nowrap">{storeName || t("appName")}</span>
         </div>
 
-        <form onSubmit={submitSearch} className="flex-1 min-w-0 flex items-center bg-white/15 rounded-full px-3 py-2">
-          <Search size={16} className="shrink-0 opacity-80" />
+        <form onSubmit={submitSearch} className="flex-1 min-w-[54px] flex items-center bg-white/15 rounded-full px-2.5 py-2">
+          <Search size={15} className="shrink-0 opacity-80" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("searchPh")}
-            className="bg-transparent outline-none text-sm placeholder-white/70 flex-1 min-w-0 ml-2"
+            className="bg-transparent outline-none text-xs placeholder-white/70 flex-1 min-w-0 ml-1.5"
           />
         </form>
 
         <button
           onClick={() => setLang(lang === "bn" ? "en" : "bn")}
-          className="press text-[11px] font-bold bg-white/15 rounded-full px-2 py-1.5 shrink-0"
+          className="press text-[10.5px] font-bold bg-white/15 rounded-full px-2 py-1.5 shrink-0"
         >
           {lang === "bn" ? "EN" : "বাংলা"}
         </button>

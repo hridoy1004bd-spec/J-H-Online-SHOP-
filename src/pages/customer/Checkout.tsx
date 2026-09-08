@@ -16,6 +16,21 @@ type Step = "identify" | "otp" | "address" | "placing" | "success";
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 const BKASH_NUMBER = "01880176772";
 const NAGAD_NUMBER = "01856191004";
+const DELIVERY_CHARGE = 120;
+
+const BD_DISTRICTS = [
+  "Bagerhat", "Bandarban", "Barguna", "Barisal", "Bhola", "Bogura", "Brahmanbaria",
+  "Chandpur", "Chapainawabganj", "Chattogram", "Chuadanga", "Cox's Bazar", "Cumilla",
+  "Dhaka", "Dinajpur", "Faridpur", "Feni", "Gaibandha", "Gazipur", "Gopalganj",
+  "Habiganj", "Jamalpur", "Jashore", "Jhalokati", "Jhenaidah", "Joypurhat",
+  "Khagrachari", "Khulna", "Kishoreganj", "Kurigram", "Kushtia", "Lakshmipur",
+  "Lalmonirhat", "Madaripur", "Magura", "Manikganj", "Meherpur", "Moulvibazar",
+  "Munshiganj", "Mymensingh", "Naogaon", "Narail", "Narayanganj", "Narsingdi",
+  "Natore", "Netrokona", "Nilphamari", "Noakhali", "Pabna", "Panchagarh",
+  "Patuakhali", "Pirojpur", "Rajbari", "Rajshahi", "Rangamati", "Rangpur",
+  "Satkhira", "Shariatpur", "Sherpur", "Sirajganj", "Sunamganj", "Sylhet",
+  "Tangail", "Thakurgaon"
+];
 
 function buildOrderWhatsappMessage(order: Order): string {
   const lines: string[] = [];
@@ -71,7 +86,7 @@ export default function Checkout() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [clientToken] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-  const deliveryCharge = /dhaka/i.test(city) ? 60 : 120;
+  const deliveryCharge = DELIVERY_CHARGE;
   const total = subtotal + deliveryCharge;
   const payNumber = paymentMethod === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
   const referenceReady = paymentReference.trim().length >= 4;
@@ -108,7 +123,7 @@ export default function Checkout() {
       showToast(
         lang === "en"
           ? "Please pay the delivery charge and enter the Transaction ID"
-          : "দয়া করে ডেলিভারি চার্জ পাঠিয়ে ট্রানজেকশন আইডি দিন",
+          : "দয়া করে ডেলিভারি চার্জ পঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
       return;
@@ -151,7 +166,7 @@ export default function Checkout() {
         <div className="text-mute text-sm mb-6 whitespace-pre-line">
           {lang === "en"
             ? "Dear customer, we've received your order. Take a screenshot of your order and send it to us via the WhatsApp button below — we'll confirm it quickly once we see it. Thank you for shopping with us."
-            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির স্ক্রিনশট নিয়ে নিচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দ্রুত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
+            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির সনশট নিয়ে নিচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দ্রুত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
         </div>
         <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
           <Row label={t("orderId")} value={placedOrder.order_number} />
@@ -244,7 +259,13 @@ export default function Checkout() {
               <input value={area} onChange={(e) => setArea(e.target.value)} className="input" />
             </Field>
             <Field label={t("city")} className="flex-1">
-              <input value={city} onChange={(e) => setCity(e.target.value)} className="input" />
+              <select value={city} onChange={(e) => setCity(e.target.value)} className="input">
+                {BD_DISTRICTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
           <Field label={t("landmark")}>
@@ -277,8 +298,8 @@ export default function Checkout() {
           </div>
           <div className="text-[11px] text-mute -mt-2">
             {lang === "en"
-              ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order."
-              : "পণ্যের দাম ক্যাশ অন ডেলিভারিতে দেবেন। শুধু নিচের ডেলিভারি চার্জটা অর্ডার নিশ্চিত করতে আগে পাঠাতে হবে।"}
+              ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order. Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days."
+              : "পণ্যের দাম ক্শ অন ডেলিভারিতে দেবেন। শুধু নিচের ডেলিভারি চার্জটা অর্ডার নিশ্চিত করতে আগে পাঠাতে হবে। ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন।"}
           </div>
 
           <div className="flex gap-2">

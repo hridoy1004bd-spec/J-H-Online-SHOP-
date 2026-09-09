@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, MessageCircle, Copy } from "lucide-react";
+import { CheckCircle2, MessageCircle, Copy, Truck } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -12,6 +12,7 @@ import { money, formatDate } from "../../utils/format";
 import type { Order, PaymentMethod } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
+type PayTab = "cod" | "bkash" | "nagad";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 const BKASH_NUMBER = "01880176772";
@@ -80,7 +81,7 @@ export default function Checkout() {
   const [area, setArea] = useState("");
   const [city, setCity] = useState("Dhaka");
   const [landmark, setLandmark] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bkash");
+  const [payTab, setPayTab] = useState<PayTab>("cod");
   const [paymentReference, setPaymentReference] = useState("");
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
@@ -88,8 +89,11 @@ export default function Checkout() {
 
   const deliveryCharge = DELIVERY_CHARGE;
   const total = subtotal + deliveryCharge;
-  const payNumber = paymentMethod === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
+  const isFullPrepay = payTab !== "cod";
+  const amountToSend = isFullPrepay ? total : deliveryCharge;
+  const payNumber = payTab === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
   const referenceReady = paymentReference.trim().length >= 4;
+  const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : payTab;
 
   async function handleSendOtp() {
     if (!isNonEmpty(name)) return showToast(t("yourName"), "error");
@@ -114,7 +118,7 @@ export default function Checkout() {
 
   function copyNumber() {
     navigator.clipboard?.writeText(payNumber);
-    showToast(lang === "en" ? "Number copied" : "নম্বর কপি হয়েছে", "success");
+    showToast(lang === "en" ? "Number copied" : "নম্বর কপ হয়েছে", "success");
   }
 
   async function handleConfirmOrder() {
@@ -122,8 +126,8 @@ export default function Checkout() {
     if (!referenceReady) {
       showToast(
         lang === "en"
-          ? "Please pay the delivery charge and enter the Transaction ID"
-          : "দয়া করে ডেলিভারি চার্জ পঠিয়ে ট্রানজেকশন আইডি দিন",
+          ? "Please make the payment and enter the Transaction ID"
+          : "দয়া করে টাকা পঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
       return;
@@ -166,7 +170,7 @@ export default function Checkout() {
         <div className="text-mute text-sm mb-6 whitespace-pre-line">
           {lang === "en"
             ? "Dear customer, we've received your order. Take a screenshot of your order and send it to us via the WhatsApp button below — we'll confirm it quickly once we see it. Thank you for shopping with us."
-            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির সনশট নিয়ে নিচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দ্রুত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
+            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির স্ক্রিনশট নিয়ে নচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
         </div>
         <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
           <Row label={t("orderId")} value={placedOrder.order_number} />
@@ -277,53 +281,60 @@ export default function Checkout() {
             <Row label={t("subtotal")} value={money(subtotal)} />
             <Row label={t("delivery")} value={money(deliveryCharge)} />
             <Row label={t("total")} value={money(total)} bold />
-            <div className="pt-2 mt-2 border-t border-border space-y-1">
-              <div className="flex justify-between">
-                <span className="text-xs font-bold text-orange">
-                  {lang === "en" ? "Pay now (delivery charge)" : "এখনই পাঠাতে হবে (ডেলিভারি চার্জ)"}
-                </span>
-                <span className="text-xs font-extrabold text-orange">{money(deliveryCharge)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs font-bold text-teal-dark">
-                  {lang === "en" ? "Pay to delivery man (product price)" : "ডেলিভারি ম্যানকে ক্যাশে দিতে হবে (পণ্যের দাম)"}
-                </span>
-                <span className="text-xs font-extrabold text-teal-dark">{money(subtotal)}</span>
-              </div>
-            </div>
           </div>
 
           <div className="text-xs font-bold text-mute uppercase pt-1">
-            {lang === "en" ? "Pay Delivery Charge First" : "প্রথমে ডেলিভারি চার্জ পরিশোধ করুন"}
+            {lang === "en" ? "Payment Method" : "পেমেন্ট পদ্ধতি"}
           </div>
-          <div className="text-[11px] text-mute -mt-2">
-            {lang === "en"
-              ? "Product price is Cash on Delivery. Only the delivery charge below must be paid in advance to confirm your order. Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days."
-              : "পণ্যের দাম ক্শ অন ডেলিভারিতে দেবেন। শুধু নিচের ডেলিভারি চার্জটা অর্ডার নিশ্চিত করতে আগে পাঠাতে হবে। ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন।"}
+          <div className="flex items-start gap-2 bg-teal-tint rounded-xl p-3">
+            <Truck size={16} className="text-teal shrink-0 mt-0.5" />
+            <div className="text-xs text-ink/80">
+              {lang === "en"
+                ? "Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days. Delivery charge ৳120 must always be paid in advance to confirm the order."
+                : "ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন। অর্ডার নিশ্চিত করতে ডেলিভারি চার্জ ৳১২০ সবসময় আগে পঠাতে হবে।"}
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => setPaymentMethod("bkash")}
-              className={`press flex-1 text-sm font-bold py-2.5 rounded-xl border ${
-                paymentMethod === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
+              onClick={() => setPayTab("cod")}
+              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+                payTab === "cod" ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
+              }`}
+            >
+              {lang === "en" ? "Cash on Delivery" : "ক্যাশ অন ডেলিভারি"}
+            </button>
+            <button
+              onClick={() => setPayTab("bkash")}
+              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+                payTab === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
               }`}
             >
               {lang === "en" ? "bKash" : "বিকাশ"}
             </button>
             <button
-              onClick={() => setPaymentMethod("nagad")}
-              className={`press flex-1 text-sm font-bold py-2.5 rounded-xl border ${
-                paymentMethod === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
+              onClick={() => setPayTab("nagad")}
+              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+                payTab === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
               }`}
             >
               {lang === "en" ? "Nagad" : "নগদ"}
             </button>
           </div>
 
+          <div className="text-[11px] text-mute -mt-2">
+            {payTab === "cod"
+              ? lang === "en"
+                ? `Pay only the delivery charge (${money(deliveryCharge)}) now via bKash/Nagad below. Pay the product price (${money(subtotal)}) in cash to the delivery man.`
+                : `শুধু ডেলিভারি চার্জ (${money(deliveryCharge)}) এখন নিচের বিকাশ/নগদ নম্বরে পাঠান। পণ্যের দাম (${money(subtotal)}) ডেলিভারি ম্যানকে ক্যাশে দেবেন।`
+              : lang === "en"
+              ? `Pay the full amount (${money(total)}) now via ${payTab === "nagad" ? "Nagad" : "bKash"}. Nothing to pay at delivery.`
+              : `পুরো টাকা (${money(total)}) এখনই ${payTab === "nagad" ? "নগদ" : "বিকাশ"}-এ পাঠান। ডেলিভারির সময় আর কিছু দিতে হবে না।`}
+          </div>
+
           <div className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
             <div className="text-xs text-mute">
-              {lang === "en" ? "Send the delivery charge to:" : "ডেলিভারি চার্জ এই নম্বরে পাঠান:"}
+              {lang === "en" ? "Send the amount to:" : "টাকা এই নম্বরে পাঠান:"}
             </div>
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-lg text-ink tracking-wide">{payNumber}</span>
@@ -332,7 +343,7 @@ export default function Checkout() {
               </button>
             </div>
             <div className="text-sm font-bold text-ink">
-              {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(deliveryCharge)}
+              {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
             </div>
           </div>
 

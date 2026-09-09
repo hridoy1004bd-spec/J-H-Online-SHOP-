@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, User, ShoppingCart, ShoppingBag } from "lucide-react";
+import { Search, User, ShoppingCart, ShoppingBag, Wallet } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../lib/supabase";
@@ -12,6 +12,7 @@ export default function Header() {
   const [query, setQuery] = useState("");
   const [storeName, setStoreName] = useState("J H Online SHOP");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -25,6 +26,19 @@ export default function Header() {
         if (data.store_name) setStoreName(data.store_name);
         if (data.logo_url) setLogoUrl(data.logo_url);
       });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", session.user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active && data) setWalletBalance(Number(data.balance));
+        });
+    });
+
     return () => {
       active = false;
     };
@@ -49,7 +63,7 @@ export default function Header() {
           <span className="font-extrabold text-[12px] leading-tight whitespace-nowrap">{storeName || t("appName")}</span>
         </div>
 
-        <form onSubmit={submitSearch} className="flex-1 min-w-[54px] flex items-center bg-white/15 rounded-full px-2.5 py-2">
+        <form onSubmit={submitSearch} className="flex-1 min-w-[44px] flex items-center bg-white/15 rounded-full px-2.5 py-2">
           <Search size={15} className="shrink-0 opacity-80" />
           <input
             value={query}
@@ -58,6 +72,15 @@ export default function Header() {
             className="bg-transparent outline-none text-xs placeholder-white/70 flex-1 min-w-0 ml-1.5"
           />
         </form>
+
+        {walletBalance !== null && (
+          <button
+            onClick={() => navigate("/account")}
+            className="press flex items-center gap-1 bg-orange text-white text-[10.5px] font-extrabold rounded-full px-2 py-1.5 shrink-0"
+          >
+            <Wallet size={12} /> ৳{walletBalance}
+          </button>
+        )}
 
         <button
           onClick={() => setLang(lang === "bn" ? "en" : "bn")}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Users2, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Users2, Search, ChevronRight } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { EmptyState } from "../../components/EmptyState";
@@ -18,6 +19,7 @@ interface CustomerRow {
 
 export default function Customers() {
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -78,15 +80,22 @@ export default function Customers() {
       ) : (
         <div className="space-y-2">
           {filtered.map((r) => (
-            <div key={r.id} className="bg-white border border-border rounded-xl p-3">
+            <button
+              key={r.id}
+              onClick={() => navigate(`/admin/customers/${r.id}`)}
+              className="press w-full text-left bg-white border border-border rounded-xl p-3"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-bold">{r.name}</div>
                   <div className="text-xs text-mute">{r.mobile}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-extrabold text-teal-dark">{money(r.totalSpent)}</div>
-                  <div className="text-[11px] text-mute">{r.totalOrders} {t("totalOrders")}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <div className="text-sm font-extrabold text-teal-dark">{money(r.totalSpent)}</div>
+                    <div className="text-[11px] text-mute">{r.totalOrders} {t("totalOrders")}</div>
+                  </div>
+                  <ChevronRight size={16} className="text-mute" />
                 </div>
               </div>
               {r.lastOrderDate && (
@@ -94,7 +103,7 @@ export default function Customers() {
                   {formatDate(r.lastOrderDate, lang)}
                 </div>
               )}
-            </div>
+            </button>
           ))}
         </div>
       )}

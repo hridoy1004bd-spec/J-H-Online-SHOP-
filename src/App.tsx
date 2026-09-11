@@ -19,6 +19,7 @@ import EditProduct from "./pages/admin/EditProduct";
 import ProductList from "./pages/admin/ProductList";
 import AdminOrders from "./pages/admin/AdminOrders";
 import Customers from "./pages/admin/Customers";
+import CustomerDetail from "./pages/admin/CustomerDetail";
 import Sales from "./pages/admin/Sales";
 import Balance from "./pages/admin/Balance";
 import PaymentSettings from "./pages/admin/PaymentSettings";
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="products/:id/edit" element={<EditProduct />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="customers" element={<Customers />} />
+        <Route path="customers/:id" element={<CustomerDetail />} />
         <Route path="sales" element={<Sales />} />
         <Route path="balance" element={<Balance />} />
         <Route path="payments" element={<PaymentSettings />} />

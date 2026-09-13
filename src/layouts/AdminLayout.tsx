@@ -49,7 +49,6 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-[#FBFCFC] flex">
-      {/* Mobile overlay */}
       {menuOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setMenuOpen(false)} />}
 
       <aside

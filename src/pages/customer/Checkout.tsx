@@ -1,23 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, MessageCircle, Copy, Truck } from "lucide-react";
+import { CheckCircle2, MessageCircle, Copy, Truck, Wallet } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
 import { otpService } from "../../services/otpService";
 import { orderService } from "../../services/orderService";
+import { supabase } from "../../lib/supabase";
 import { isNonEmpty, isValidBangladeshiMobile } from "../../utils/validation";
 import { money, formatDate } from "../../utils/format";
 import type { Order, PaymentMethod } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
-type PayTab = "cod" | "bkash" | "nagad";
+type PayTab = "cod" | "bkash" | "nagad" | "wallet";
+type LoginMode = "otp" | "password";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 const BKASH_NUMBER = "01880176772";
 const NAGAD_NUMBER = "01856191004";
 const DELIVERY_CHARGE = 120;
+
+function mobileToInternalEmail(mobile: string): string {
+  return `${mobile}@customers.jhonlineshop.internal`;
+}
 
 const BD_DISTRICTS = [
   "Bagerhat", "Bandarban", "Barguna", "Barisal", "Bhola", "Bogura", "Brahmanbaria",
@@ -71,9 +77,11 @@ export default function Checkout() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(customer ? "address" : "identify");
+  const [loginMode, setLoginMode] = useState<LoginMode>("otp");
   const [name, setName] = useState(customer?.name ?? "");
   const [mobile, setMobile] = useState(customer?.mobile ?? "");
   const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -87,13 +95,29 @@ export default function Checkout() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [clientToken] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+
+  useEffect(() => {
+    async function loadWallet() {
+      if (!customer?.auth_user_id) return;
+      const { data } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", customer.auth_user_id)
+        .maybeSingle();
+      setWalletBalance(Number(data?.balance ?? 0));
+    }
+    loadWallet();
+  }, [customer?.auth_user_id]);
+
   const deliveryCharge = DELIVERY_CHARGE;
   const total = subtotal + deliveryCharge;
-  const isFullPrepay = payTab !== "cod";
+  const isFullPrepay = payTab !== "cod" && payTab !== "wallet";
   const amountToSend = isFullPrepay ? total : deliveryCharge;
   const payNumber = payTab === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
   const referenceReady = paymentReference.trim().length >= 4;
-  const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : payTab;
+  const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : (payTab as PaymentMethod);
+  const walletSufficient = walletBalance >= total;
 
   async function handleSendOtp() {
     if (!isNonEmpty(name)) return showToast(t("yourName"), "error");
@@ -116,6 +140,29 @@ export default function Checkout() {
     setStep("address");
   }
 
+  async function handlePasswordLogin() {
+    if (!isValidBangladeshiMobile(mobile)) return showToast(t("mobileNumber"), "error");
+    if (password.length < 4) {
+      showToast(lang === "en" ? "Please enter your password" : "পাসওয়ার্ড দিন", "error");
+      return;
+    }
+    setSending(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: mobileToInternalEmail(mobile),
+      password
+    });
+    setSending(false);
+    if (error) {
+      showToast(
+        lang === "en" ? "Incorrect mobile number or password" : "মোবাইল নম্বর বা পাসওয়ার্ড ভুল হয়েছে",
+        "error"
+      );
+      return;
+    }
+    await refreshCustomer();
+    setStep("address");
+  }
+
   function copyNumber() {
     navigator.clipboard?.writeText(payNumber);
     showToast(lang === "en" ? "Number copied" : "নম্বর কপ হয়েছে", "success");
@@ -123,6 +170,55 @@ export default function Checkout() {
 
   async function handleConfirmOrder() {
     if (!isNonEmpty(fullAddress) || !isNonEmpty(city)) return showToast(t("deliveryAddress"), "error");
+
+    if (payTab === "wallet") {
+      if (!customer?.auth_user_id) return showToast(t("error"), "error");
+      if (!walletSufficient) {
+        showToast(
+          lang === "en" ? "Insufficient wallet balance" : "ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই",
+          "error"
+        );
+        return;
+      }
+      setStep("placing");
+      setPlaceError(null);
+
+      const { data, error } = await supabase.rpc("create_order_wallet_atomic", {
+        p_customer_id: customer.id,
+        p_user_id: customer.auth_user_id,
+        p_full_address: fullAddress,
+        p_area: area,
+        p_city: city,
+        p_landmark: landmark,
+        p_items: items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity })),
+        p_client_token: clientToken
+      });
+
+      if (error || !data?.success) {
+        const errCode = data?.error;
+        const msg =
+          errCode === "INSUFFICIENT_BALANCE"
+            ? lang === "en"
+              ? "Insufficient wallet balance"
+              : "ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই"
+            : error?.message || t("error");
+        setPlaceError(msg);
+        setStep("address");
+        return;
+      }
+
+      const { data: fullOrder } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("id", data.id)
+        .single();
+
+      setPlacedOrder((fullOrder as unknown as Order) ?? null);
+      clear();
+      setStep("success");
+      return;
+    }
+
     if (!referenceReady) {
       showToast(
         lang === "en"
@@ -206,21 +302,74 @@ export default function Checkout() {
 
       {step === "identify" && (
         <div className="px-4 space-y-4">
-          <Field label={t("yourName")}>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} className="input" />
-          </Field>
-          <Field label={t("mobileNumber")}>
-            <input
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
-              placeholder={t("mobilePh")}
-              maxLength={11}
-              className="input"
-            />
-          </Field>
-          <button onClick={handleSendOtp} disabled={sending} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
-            {sending ? t("loading") : t("sendOtp")}
-          </button>
+          <div className="grid grid-cols-2 gap-2 bg-teal-tint p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setLoginMode("otp")}
+              className={`press text-xs font-bold py-2 rounded-lg ${
+                loginMode === "otp" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
+              }`}
+            >
+              {lang === "en" ? "Login with OTP" : "OTP দিয়ে লগইন"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMode("password")}
+              className={`press text-xs font-bold py-2 rounded-lg ${
+                loginMode === "password" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
+              }`}
+            >
+              {lang === "en" ? "Login with Password" : "পাসওয়ার্ড দিয়ে লগইন"}
+            </button>
+          </div>
+
+          {loginMode === "otp" ? (
+            <>
+              <Field label={t("yourName")}>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} className="input" />
+              </Field>
+              <Field label={t("mobileNumber")}>
+                <input
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                  placeholder={t("mobilePh")}
+                  maxLength={11}
+                  className="input"
+                />
+              </Field>
+              <button onClick={handleSendOtp} disabled={sending} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
+                {sending ? t("loading") : t("sendOtp")}
+              </button>
+            </>
+          ) : (
+            <>
+              <Field label={t("mobileNumber")}>
+                <input
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                  placeholder={t("mobilePh")}
+                  maxLength={11}
+                  className="input"
+                />
+              </Field>
+              <Field label={lang === "en" ? "Password" : "পাসওয়ার্ড"}>
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  placeholder={lang === "en" ? "Your password" : "আপনার পাসওয়ার্ড"}
+                  className="input"
+                />
+              </Field>
+              <button
+                onClick={handlePasswordLogin}
+                disabled={sending}
+                className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
+              >
+                {sending ? t("loading") : lang === "en" ? "Login" : "লগইন করুন"}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -295,18 +444,18 @@ export default function Checkout() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             <button
               onClick={() => setPayTab("cod")}
-              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
                 payTab === "cod" ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
               }`}
             >
-              {lang === "en" ? "Cash on Delivery" : "ক্যাশ অন ডেলিভারি"}
+              {lang === "en" ? "COD" : "ক্যাশ অন ডেলিভারি"}
             </button>
             <button
               onClick={() => setPayTab("bkash")}
-              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
                 payTab === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
               }`}
             >
@@ -314,51 +463,89 @@ export default function Checkout() {
             </button>
             <button
               onClick={() => setPayTab("nagad")}
-              className={`press text-xs font-bold py-2.5 rounded-xl border ${
+              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
                 payTab === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
               }`}
             >
               {lang === "en" ? "Nagad" : "নগদ"}
             </button>
+            <button
+              onClick={() => setPayTab("wallet")}
+              className={`press text-[11px] font-bold py-2.5 rounded-xl border flex flex-col items-center gap-0.5 ${
+                payTab === "wallet" ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
+              }`}
+            >
+              <Wallet size={13} />
+              {lang === "en" ? "Wallet" : "ওয়ালেট"}
+            </button>
           </div>
 
-          <div className="text-[11px] text-mute -mt-2">
-            {payTab === "cod"
-              ? lang === "en"
-                ? `Pay only the delivery charge (${money(deliveryCharge)}) now via bKash/Nagad below. Pay the product price (${money(subtotal)}) in cash to the delivery man.`
-                : `শুধু ডেলিভারি চার্জ (${money(deliveryCharge)}) এখন নিচের বিকাশ/নগদ নম্বরে পাঠান। পণ্যের দাম (${money(subtotal)}) ডেলিভারি ম্যানকে ক্যাশে দেবেন।`
-              : lang === "en"
-              ? `Pay the full amount (${money(total)}) now via ${payTab === "nagad" ? "Nagad" : "bKash"}. Nothing to pay at delivery.`
-              : `পুরো টাকা (${money(total)}) এখনই ${payTab === "nagad" ? "নগদ" : "বিকাশ"}-এ পাঠান। ডেলিভারির সময় আর কিছু দিতে হবে না।`}
-          </div>
+          {payTab === "wallet" ? (
+            <div className={`rounded-xl p-3 border ${walletSufficient ? "bg-teal-tint border-teal/20" : "bg-red-50 border-red-200"}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-mute">
+                  {lang === "en" ? "Your Wallet Balance" : "আপনার ওয়ালেট ব্যালেন্স"}
+                </span>
+                <span className={`text-base font-extrabold ${walletSufficient ? "text-teal-dark" : "text-red-600"}`}>
+                  {money(walletBalance)}
+                </span>
+              </div>
+              {!walletSufficient && (
+                <div className="text-[11px] text-red-600 font-semibold mt-1">
+                  {lang === "en"
+                    ? `You need ${money(total)} but your balance is ${money(walletBalance)}. Add a gift card or choose another payment method.`
+                    : `আপনার ${money(total)} দরকার কিন্তু ব্যালেন্স আছে ${money(walletBalance)}। গিফট কার্ড যোগ করুন অথবা অন্য পেমেন্ট মেথড বেছে নিন।`}
+                </div>
+              )}
+              {walletSufficient && (
+                <div className="text-[11px] text-teal-dark/80 mt-1">
+                  {lang === "en"
+                    ? `${money(total)} will be deducted from your wallet immediately.`
+                    : `${money(total)} সাথে সাথে আপনার ওয়ালেট থেকে কেটে নেওয়া হবে।`}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="text-[11px] text-mute -mt-2">
+                {payTab === "cod"
+                  ? lang === "en"
+                    ? `Pay only the delivery charge (${money(deliveryCharge)}) now via bKash/Nagad below. Pay the product price (${money(subtotal)}) in cash to the delivery man.`
+                    : `শুধু ডেলিভারি চার্জ (${money(deliveryCharge)}) এখন নিচের বিকাশ/নগদ নম্বরে পাঠান। পণ্যের দাম (${money(subtotal)}) ডেলিভারি ম্যানকে ক্যাশে দেবেন।`
+                  : lang === "en"
+                  ? `Pay the full amount (${money(total)}) now via ${payTab === "nagad" ? "Nagad" : "bKash"}. Nothing to pay at delivery.`
+                  : `পুরো টাকা (${money(total)}) এখনই ${payTab === "nagad" ? "নগদ" : "বিকাশ"}-এ পাঠান। ডেলিভারির সময় আর কিছু দিতে হবে না।`}
+              </div>
 
-          <div className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
-            <div className="text-xs text-mute">
-              {lang === "en" ? "Send the amount to:" : "টাকা এই নম্বরে পাঠান:"}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-extrabold text-lg text-ink tracking-wide">{payNumber}</span>
-              <button onClick={copyNumber} className="press flex items-center gap-1 text-xs font-bold text-teal-dark bg-white px-3 py-1.5 rounded-full">
-                <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
-              </button>
-            </div>
-            <div className="text-sm font-bold text-ink">
-              {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
-            </div>
-          </div>
+              <div className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
+                <div className="text-xs text-mute">
+                  {lang === "en" ? "Send the amount to:" : "টাকা এই নম্বরে পাঠান:"}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-lg text-ink tracking-wide">{payNumber}</span>
+                  <button onClick={copyNumber} className="press flex items-center gap-1 text-xs font-bold text-teal-dark bg-white px-3 py-1.5 rounded-full">
+                    <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
+                  </button>
+                </div>
+                <div className="text-sm font-bold text-ink">
+                  {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
+                </div>
+              </div>
 
-          <Field label={lang === "en" ? "Transaction ID" : "ট্রানজেকশন আইডি"}>
-            <input
-              value={paymentReference}
-              onChange={(e) => setPaymentReference(e.target.value)}
-              placeholder={lang === "en" ? "e.g. 8N7A6B5C4D" : "যেমন: 8N7A6B5C4D"}
-              className="input"
-            />
-          </Field>
+              <Field label={lang === "en" ? "Transaction ID" : "ট্রানজেকশন আইডি"}>
+                <input
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  placeholder={lang === "en" ? "e.g. 8N7A6B5C4D" : "যেমন: 8N7A6B5C4D"}
+                  className="input"
+                />
+              </Field>
+            </>
+          )}
 
           <button
             onClick={handleConfirmOrder}
-            disabled={step === "placing" || !referenceReady}
+            disabled={step === "placing" || (payTab === "wallet" ? !walletSufficient : !referenceReady)}
             className="press w-full bg-orange text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
           >
             {step === "placing" ? t("placingOrder") : t("confirmOrder")}

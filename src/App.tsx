@@ -20,6 +20,7 @@ import ProductList from "./pages/admin/ProductList";
 import AdminOrders from "./pages/admin/AdminOrders";
 import Customers from "./pages/admin/Customers";
 import CustomerDetail from "./pages/admin/CustomerDetail";
+import GiftCards from "./pages/admin/GiftCards";
 import Sales from "./pages/admin/Sales";
 import Balance from "./pages/admin/Balance";
 import PaymentSettings from "./pages/admin/PaymentSettings";
@@ -32,7 +33,6 @@ import FeaturedBanners from "./pages/admin/FeaturedBanners";
 export default function App() {
   return (
     <Routes>
-      {/* Customer-facing storefront */}
       <Route element={<CustomerLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/categories" element={<Categories />} />
@@ -44,7 +44,6 @@ export default function App() {
         <Route path="/account" element={<Account />} />
       </Route>
 
-      {/* Admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
@@ -54,6 +53,7 @@ export default function App() {
         <Route path="orders" element={<AdminOrders />} />
         <Route path="customers" element={<Customers />} />
         <Route path="customers/:id" element={<CustomerDetail />} />
+        <Route path="gift-cards" element={<GiftCards />} />
         <Route path="sales" element={<Sales />} />
         <Route path="balance" element={<Balance />} />
         <Route path="payments" element={<PaymentSettings />} />

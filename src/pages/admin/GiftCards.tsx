@@ -52,7 +52,7 @@ export default function GiftCards() {
     loadCards();
   }, []);
 
-  const finalAmount = selectedAmount ?? Number(customAmount) || 0;
+  const finalAmount = selectedAmount ?? (Number(customAmount) || 0);
 
   async function handleCreate() {
     if (finalAmount <= 0) {

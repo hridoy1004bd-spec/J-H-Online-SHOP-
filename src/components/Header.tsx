@@ -77,14 +77,31 @@ export default function Header() {
           <span className="font-extrabold text-[13.5px] leading-tight whitespace-nowrap">{storeName || t("appName")}</span>
         </div>
 
-        <button onClick={() => setMenuOpen((v) => !v)} className="press shrink-0 relative">
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          {itemCount > 0 && !menuOpen && (
-            <span className="absolute -top-1 -right-1 bg-orange text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-              {itemCount > 9 ? "9+" : itemCount}
-            </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {walletBalance !== null && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBalance((v) => !v);
+              }}
+              className="press flex items-center gap-1 bg-white/15 rounded-full px-2.5 py-1.5"
+            >
+              <Wallet size={13} />
+              <span className="text-[11px] font-extrabold">
+                {showBalance ? `৳${walletBalance}` : "৳ ●●●"}
+              </span>
+            </button>
           )}
-        </button>
+
+          <button onClick={() => setMenuOpen((v) => !v)} className="press relative">
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {itemCount > 0 && !menuOpen && (
+              <span className="absolute -top-1 -right-1 bg-orange text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {itemCount > 9 ? "9+" : itemCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {menuOpen && (

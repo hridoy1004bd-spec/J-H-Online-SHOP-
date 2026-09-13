@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Image,
   Megaphone,
+  Gift,
   Menu,
   X,
   LogOut
@@ -37,6 +38,7 @@ export default function AdminLayout() {
     { to: "/admin/customers", icon: Users2, label: t("customers") },
     { to: "/admin/sales", icon: TrendingUp, label: t("salesProfit") },
     { to: "/admin/balance", icon: Wallet, label: t("balance") },
+    { to: "/admin/gift-cards", icon: Gift, label: lang === "en" ? "Gift Cards" : "গিফট কার্ড" },
     { to: "/admin/payments", icon: CreditCard, label: t("paymentSettings") },
     { to: "/admin/settings", icon: SettingsIcon, label: t("storeSettings") },
     { to: "/admin/support", icon: MessageCircle, label: t("support") },

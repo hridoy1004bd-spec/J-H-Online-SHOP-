@@ -204,7 +204,7 @@ export default function Dashboard() {
   );
 }
 
-function OrderCard({ order, lang }: { order: OrderRow; lang: string }) {
+function OrderCard({ order, lang }: { order: OrderRow; lang: "en" | "bn" }) {
   const paid = isPaid(order);
   return (
     <div className="bg-white border border-border rounded-xl p-3">

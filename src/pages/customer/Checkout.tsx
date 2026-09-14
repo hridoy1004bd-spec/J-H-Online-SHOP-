@@ -7,7 +7,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
 import { otpService } from "../../services/otpService";
 import { orderService } from "../../services/orderService";
-import { supabase } from "../../lib/supabase";
+import { supabase, FUNCTIONS_URL } from "../../lib/supabase";
 import { isNonEmpty, isValidBangladeshiMobile } from "../../utils/validation";
 import { money, formatDate } from "../../utils/format";
 import type { Order, PaymentMethod } from "../../types";
@@ -168,6 +168,21 @@ export default function Checkout() {
     showToast(lang === "en" ? "Number copied" : "নম্বর কপ হয়েছে", "success");
   }
 
+  async function notifyTelegram(orderId: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      await fetch(`${FUNCTIONS_URL}/notify-order-telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId })
+      });
+    } catch {
+      // Non-critical: order is already placed even if the notification fails.
+    }
+  }
+
   async function handleConfirmOrder() {
     if (!isNonEmpty(fullAddress) || !isNonEmpty(city)) return showToast(t("deliveryAddress"), "error");
 
@@ -212,6 +227,8 @@ export default function Checkout() {
         .select("*, order_items(*)")
         .eq("id", data.id)
         .single();
+
+      notifyTelegram(data.id);
 
       setPlacedOrder((fullOrder as unknown as Order) ?? null);
       clear();

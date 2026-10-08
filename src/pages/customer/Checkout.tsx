@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, MessageCircle, Copy, Truck, Wallet } from "lucide-react";
+import { CheckCircle2, MessageCircle, Copy, Truck, Wallet, Eye, EyeOff } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -14,7 +14,7 @@ import type { Order, PaymentMethod } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
 type PayTab = "cod" | "bkash" | "nagad" | "wallet";
-type LoginMode = "otp" | "password";
+type LoginMode = "login" | "signup";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 const BKASH_NUMBER = "01880176772";
@@ -69,6 +69,36 @@ function buildOrderWhatsappMessage(order: Order): string {
   return lines.join("\n");
 }
 
+function PasswordInput({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        className="input pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-mute"
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  );
+}
+
 export default function Checkout() {
   const { items, subtotal, clear } = useCart();
   const { customer, refreshCustomer } = useAuth();
@@ -77,7 +107,7 @@ export default function Checkout() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(customer ? "address" : "identify");
-  const [loginMode, setLoginMode] = useState<LoginMode>("otp");
+  const [loginMode, setLoginMode] = useState<LoginMode>("login");
   const [name, setName] = useState(customer?.name ?? "");
   const [mobile, setMobile] = useState(customer?.mobile ?? "");
   const [otp, setOtp] = useState("");
@@ -122,6 +152,13 @@ export default function Checkout() {
   async function handleSendOtp() {
     if (!isNonEmpty(name)) return showToast(t("yourName"), "error");
     if (!isValidBangladeshiMobile(mobile)) return showToast(t("mobileNumber"), "error");
+    if (password.length < 6) {
+      showToast(
+        lang === "en" ? "Password must be at least 6 characters" : "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন",
+        "error"
+      );
+      return;
+    }
     setSending(true);
     const res = await otpService.sendOtp(mobile, "order");
     setSending(false);
@@ -133,7 +170,7 @@ export default function Checkout() {
   async function handleVerifyOtp() {
     if (otp.length < 4) return;
     setSending(true);
-    const res = await otpService.verifyOtp(mobile, otp, name);
+    const res = await otpService.verifyOtp(mobile, otp, name, password);
     setSending(false);
     if (!res.success) return showToast(res.error || t("error"), "error");
     await refreshCustomer();
@@ -322,25 +359,60 @@ export default function Checkout() {
           <div className="grid grid-cols-2 gap-2 bg-teal-tint p-1 rounded-xl">
             <button
               type="button"
-              onClick={() => setLoginMode("otp")}
+              onClick={() => setLoginMode("login")}
               className={`press text-xs font-bold py-2 rounded-lg ${
-                loginMode === "otp" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
+                loginMode === "login" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
               }`}
             >
-              {lang === "en" ? "Login with OTP" : "OTP দিয়ে লগইন"}
+              {lang === "en" ? "Login" : "লগইন"}
             </button>
             <button
               type="button"
-              onClick={() => setLoginMode("password")}
+              onClick={() => setLoginMode("signup")}
               className={`press text-xs font-bold py-2 rounded-lg ${
-                loginMode === "password" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
+                loginMode === "signup" ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"
               }`}
             >
-              {lang === "en" ? "Login with Password" : "পাসওয়ার্ড দিয়ে লগইন"}
+              {lang === "en" ? "New Account" : "নতুন অ্যাকাউন্ট"}
             </button>
           </div>
 
-          {loginMode === "otp" ? (
+          {loginMode === "login" ? (
+            <>
+              <Field label={t("mobileNumber")}>
+                <input
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                  placeholder={t("mobilePh")}
+                  maxLength={11}
+                  className="input"
+                />
+              </Field>
+              <Field label={lang === "en" ? "Password" : "পাসওয়ার্ড"}>
+                <PasswordInput
+                  value={password}
+                  onChange={setPassword}
+                  placeholder={lang === "en" ? "Your password" : "আপনার পাসওয়ার্ড"}
+                />
+              </Field>
+              <button
+                onClick={handlePasswordLogin}
+                disabled={sending}
+                className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
+              >
+                {sending ? t("loading") : lang === "en" ? "Login" : "লগইন করুন"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginMode("signup")}
+                className="w-full text-[11px] text-teal font-semibold"
+              >
+                {lang === "en"
+                  ? "Forgot password / ordered before without a password? Tap here"
+                  : "পাসওয়ার্ড ভুলে গেছেন বা আগে অর্ডার করেছেন কিন্তু পাসওয়ার্ড নেই? এখানে চাপুন"}
+              </button>
+            </>
+          ) : (
             <>
               <Field label={t("yourName")}>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} className="input" />
@@ -354,36 +426,20 @@ export default function Checkout() {
                   className="input"
                 />
               </Field>
+              <Field label={lang === "en" ? "Create a password" : "নতুন পাসওয়ার্ড"}>
+                <PasswordInput
+                  value={password}
+                  onChange={setPassword}
+                  placeholder={lang === "en" ? "At least 6 characters" : "কমপক্ষে ৬ অক্ষর"}
+                />
+              </Field>
+              <div className="text-[11px] text-mute -mt-2">
+                {lang === "en"
+                  ? "Already have an account? Enter your number and a new password here to set it."
+                  : "আগে থেকে অ্যাকাউন্ট থাকলে একই নম্বরে নতুন পাসওয়ার্ড দিন, সেটাই আপনার পাসওয়ার্ড হবে।"}
+              </div>
               <button onClick={handleSendOtp} disabled={sending} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
                 {sending ? t("loading") : t("sendOtp")}
-              </button>
-            </>
-          ) : (
-            <>
-              <Field label={t("mobileNumber")}>
-                <input
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
-                  placeholder={t("mobilePh")}
-                  maxLength={11}
-                  className="input"
-                />
-              </Field>
-              <Field label={lang === "en" ? "Password" : "পাসওয়ার্ড"}>
-                <input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type="password"
-                  placeholder={lang === "en" ? "Your password" : "আপনার পাসওয়ার্ড"}
-                  className="input"
-                />
-              </Field>
-              <button
-                onClick={handlePasswordLogin}
-                disabled={sending}
-                className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
-              >
-                {sending ? t("loading") : lang === "en" ? "Login" : "লগইন করুন"}
               </button>
             </>
           )}

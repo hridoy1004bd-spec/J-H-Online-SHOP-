@@ -38,12 +38,12 @@ export const otpService = {
     }
   },
 
-  async verifyOtp(mobile: string, code: string, name?: string): Promise<VerifyOtpResult> {
+  async verifyOtp(mobile: string, code: string, name?: string, password?: string): Promise<VerifyOtpResult> {
     try {
       const res = await fetch(`${FUNCTIONS_URL}/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, code, name })
+        body: JSON.stringify({ mobile, code, name, password })
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Verification failed" };

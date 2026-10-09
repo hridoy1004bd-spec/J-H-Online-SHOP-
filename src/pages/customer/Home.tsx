@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { productService } from "../../services/productService";
 import ProductCard from "../../components/ProductCard";
-import CategoryMenu from "../../components/CategoryMenu";
+import CategoryShowcase from "../../components/CategoryShowcase";
+import { loadCategoryImages } from "../../services/categoryImages";
 import BannerSlider from "../../components/BannerSlider";
 import FeaturedBannerSlider from "../../components/FeaturedBannerSlider";
 import NoticeTicker from "../../components/NoticeTicker";
@@ -30,7 +31,7 @@ function Section({ title, products }: { title: string; products: Product[] }) {
 export default function Home() {
   const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeIds, setActiveIds] = useState<string[] | null>(null);
+  const [catImages, setCatImages] = useState<Record<string, string>>({});
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
@@ -44,12 +45,13 @@ export default function Home() {
     try {
       const [cats, general, arrivals, best, feat] = await Promise.all([
         productService.listCategories(),
-        productService.list({ categoryId: activeIds ?? undefined, pageSize: 12 }),
+        productService.list({ pageSize: 12 }),
         productService.list({ newArrivals: true, pageSize: 8 }),
         productService.list({ bestSeller: true, pageSize: 8 }),
         productService.list({ featured: true, pageSize: 8 })
       ]);
       setCategories(cats as Category[]);
+      loadCategoryImages(cats as Category[]).then(setCatImages).catch(() => {});
       setAllProducts(general.products);
       setNewArrivals(arrivals.products);
       setBestSellers(best.products);
@@ -64,7 +66,7 @@ export default function Home() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIds]);
+  }, []);
 
   if (error) return <ErrorState onRetry={load} />;
 
@@ -75,16 +77,16 @@ export default function Home() {
       <FeaturedBannerSlider />
       <RecentOrderNotice />
 
-      <CategoryMenu categories={categories} activeIds={activeIds} onSelect={setActiveIds} />
+      <CategoryShowcase categories={categories} images={catImages} />
 
       {loading ? (
         <ProductGridSkeleton count={8} />
       ) : (
         <>
-          {activeIds === null && <Section title={t("featured")} products={featured} />}
-          {activeIds === null && <Section title={t("newArrivals")} products={newArrivals} />}
-          {activeIds === null && <Section title={t("bestSelling")} products={bestSellers} />}
-          <Section title={activeIds ? t("all") : t("recommended")} products={allProducts} />
+          <Section title={t("featured")} products={featured} />
+          <Section title={t("newArrivals")} products={newArrivals} />
+          <Section title={t("bestSelling")} products={bestSellers} />
+          <Section title={t("recommended")} products={allProducts} />
         </>
       )}
     </div>

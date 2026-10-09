@@ -12,6 +12,7 @@ interface VariantRow {
   size: string;
   color: string;
   quantity: number;
+  imageUrl: string;
   inventoryId: string | null;
   isNew?: boolean;
 }
@@ -68,6 +69,7 @@ export default function EditProduct() {
           size: v.size ?? "",
           color: v.color ?? "",
           quantity: inv ? Math.max(0, inv.quantity - inv.reserved) : 0,
+          imageUrl: v.image_url ?? "",
           inventoryId: inv?.id ?? null
         };
       });
@@ -144,7 +146,7 @@ export default function EditProduct() {
   }
 
   function addVariantRow() {
-    setVariants((v) => [...v, { id: null, size: "", color: "", quantity: 0, inventoryId: null, isNew: true }]);
+    setVariants((v) => [...v, { id: null, size: "", color: "", quantity: 0, imageUrl: "", inventoryId: null, isNew: true }]);
   }
 
   function updateVariantRow(idx: number, patch: Partial<VariantRow>) {
@@ -160,7 +162,7 @@ export default function EditProduct() {
       if (!variantId) {
         const { data, error } = await supabase
           .from("product_variants")
-          .insert({ product_id: id, size: row.size || null, color: row.color || null })
+          .insert({ product_id: id, size: row.size || null, color: row.color || null, image_url: row.imageUrl || null })
           .select()
           .single();
         if (error) throw error;
@@ -168,7 +170,7 @@ export default function EditProduct() {
       } else {
         const { error } = await supabase
           .from("product_variants")
-          .update({ size: row.size || null, color: row.color || null })
+          .update({ size: row.size || null, color: row.color || null, image_url: row.imageUrl || null })
           .eq("id", variantId);
         if (error) throw error;
       }
@@ -189,12 +191,34 @@ export default function EditProduct() {
         updateVariantRow(idx, { inventoryId: data.id });
       }
 
+      // একই রঙের সব সাইজে একই ছবি প্রযোজ্য
+      if (row.color && row.imageUrl) {
+        await supabase
+          .from("product_variants")
+          .update({ image_url: row.imageUrl })
+          .eq("product_id", id)
+          .eq("color", row.color);
+        setVariants((vs) => vs.map((r) => (r.color === row.color ? { ...r, imageUrl: row.imageUrl } : r)));
+      }
       updateVariantRow(idx, { id: variantId, isNew: false });
       showToast(lang === "en" ? "Variant saved" : "ভ্যারিয়েন্ট সেভ হয়েছে", "success");
     } catch (err: any) {
       showToast(err.message || t("error"), "error");
     } finally {
       setVariantSaving(false);
+    }
+  }
+
+  async function uploadVariantImage(idx: number, file: File | undefined) {
+    if (!file || !id) return;
+    const err = uploadService.validate(file);
+    if (err) return showToast(err, "error");
+    try {
+      const { url } = await uploadService.uploadProductImage(file, id);
+      updateVariantRow(idx, { imageUrl: url });
+      showToast(lang === "en" ? "Image added — press Save" : "ছবি যোগ হয়েছে — সেভ চাপুন", "success");
+    } catch (e: any) {
+      showToast(e.message || t("error"), "error");
     }
   }
 
@@ -306,7 +330,8 @@ export default function EditProduct() {
 
         <div className="space-y-2 mb-3">
           {variants.map((row, idx) => (
-            <div key={idx} className="bg-white border border-border rounded-xl p-3 flex items-center gap-2">
+            <div key={idx} className="bg-white border border-border rounded-xl p-3">
+              <div className="flex items-center gap-2">
               <input
                 value={row.size}
                 onChange={(e) => updateVariantRow(idx, { size: e.target.value })}
@@ -336,6 +361,24 @@ export default function EditProduct() {
               <button onClick={() => deleteVariantRow(idx)} className="press text-red-600 shrink-0">
                 <Trash2 size={16} />
               </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                {row.imageUrl ? (
+                  <img src={row.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover border border-border shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-teal-tint shrink-0" />
+                )}
+                <input
+                  value={row.imageUrl}
+                  onChange={(e) => updateVariantRow(idx, { imageUrl: e.target.value })}
+                  placeholder={lang === "en" ? "Color image URL" : "রঙের ছবির লিংক"}
+                  className="input flex-1 min-w-0 text-xs"
+                />
+                <label className="press bg-teal-tint text-teal-dark rounded-lg p-2.5 cursor-pointer shrink-0">
+                  <Upload size={15} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => uploadVariantImage(idx, e.target.files?.[0])} />
+                </label>
+              </div>
             </div>
           ))}
         </div>

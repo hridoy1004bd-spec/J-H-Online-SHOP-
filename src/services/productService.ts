@@ -4,7 +4,7 @@ import type { Product } from "../types";
 const PRODUCT_SELECT = `
   *,
   product_images ( id, url, thumbnail_url, is_main, sort_order ),
-  product_variants ( id, size, color ),
+  product_variants ( id, size, color, image_url ),
   inventory ( id, variant_id, quantity, reserved )
 `;
 

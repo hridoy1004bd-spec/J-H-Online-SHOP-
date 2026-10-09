@@ -4,7 +4,18 @@ import { supabase } from "../../lib/supabase";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
 import { LineSkeleton } from "../../components/LoadingSkeleton";
-import type { StoreSettings } from "../../types";
+import type { StoreSettings as BaseSettings } from "../../types";
+
+type StoreSettings = BaseSettings & {
+  email?: string | null;
+  address?: string | null;
+  facebook_url?: string | null;
+  youtube_url?: string | null;
+  instagram_url?: string | null;
+  footer_about_bn?: string | null;
+  footer_about_en?: string | null;
+  footer_links?: { label: string; url: string }[] | null;
+};
 
 export default function Settings() {
   const { t } = useLanguage();
@@ -34,6 +45,14 @@ export default function Settings() {
         store_name: settings.store_name,
         phone: settings.phone,
         whatsapp: settings.whatsapp,
+        email: settings.email?.trim() || null,
+        address: settings.address?.trim() || null,
+        facebook_url: settings.facebook_url?.trim() || null,
+        youtube_url: settings.youtube_url?.trim() || null,
+        instagram_url: settings.instagram_url?.trim() || null,
+        footer_about_bn: settings.footer_about_bn?.trim() || null,
+        footer_about_en: settings.footer_about_en?.trim() || null,
+        footer_links: (settings.footer_links ?? []).filter((l) => l.label.trim() && l.url.trim()),
         delivery_charge_inside_dhaka: settings.delivery_charge_inside_dhaka,
         delivery_charge_outside_dhaka: settings.delivery_charge_outside_dhaka,
         cod_enabled: settings.cod_enabled
@@ -70,6 +89,76 @@ export default function Settings() {
       <Field label={t("whatsapp")}>
         <input value={settings.whatsapp ?? ""} onChange={(e) => setSettings({ ...settings, whatsapp: e.target.value })} className="input" />
       </Field>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">ফুটার / Footer</div>
+      <Field label="Email">
+        <input value={settings.email ?? ""} onChange={(e) => setSettings({ ...settings, email: e.target.value })} placeholder="support@example.com" className="input" />
+      </Field>
+      <Field label="ঠিকানা / Address">
+        <input value={settings.address ?? ""} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="input" />
+      </Field>
+      <Field label="Facebook লিংক">
+        <input value={settings.facebook_url ?? ""} onChange={(e) => setSettings({ ...settings, facebook_url: e.target.value })} placeholder="https://facebook.com/..." className="input" />
+      </Field>
+      <Field label="YouTube লিংক">
+        <input value={settings.youtube_url ?? ""} onChange={(e) => setSettings({ ...settings, youtube_url: e.target.value })} placeholder="https://youtube.com/..." className="input" />
+      </Field>
+      <Field label="Instagram লিংক">
+        <input value={settings.instagram_url ?? ""} onChange={(e) => setSettings({ ...settings, instagram_url: e.target.value })} placeholder="https://instagram.com/..." className="input" />
+      </Field>
+      <Field label="দোকানের বর্ণনা (বাংলা)">
+        <textarea value={settings.footer_about_bn ?? ""} onChange={(e) => setSettings({ ...settings, footer_about_bn: e.target.value })} rows={2} className="input resize-none" />
+      </Field>
+      <Field label="Shop description (English)">
+        <textarea value={settings.footer_about_en ?? ""} onChange={(e) => setSettings({ ...settings, footer_about_en: e.target.value })} rows={2} className="input resize-none" />
+      </Field>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-1">ফুটারের পেইজ লিংক</div>
+      <div className="text-[11px] text-mute mb-2">
+        সাইটের ভেতরের পেইজ হলে /categories এভাবে লিখুন। বাইরের লিংক হলে https:// দিয়ে পুরো লিংক দিন। চাপলে সরাসরি ওই পেইজে যাবে।
+      </div>
+      <div className="space-y-2 mb-4">
+        {(settings.footer_links ?? []).map((l, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              value={l.label}
+              onChange={(e) => {
+                const next = [...(settings.footer_links ?? [])];
+                next[i] = { ...next[i], label: e.target.value };
+                setSettings({ ...settings, footer_links: next });
+              }}
+              placeholder="নাম"
+              className="input flex-1 min-w-0"
+            />
+            <input
+              value={l.url}
+              onChange={(e) => {
+                const next = [...(settings.footer_links ?? [])];
+                next[i] = { ...next[i], url: e.target.value };
+                setSettings({ ...settings, footer_links: next });
+              }}
+              placeholder="/page বা https://..."
+              className="input flex-1 min-w-0"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setSettings({ ...settings, footer_links: (settings.footer_links ?? []).filter((_, idx) => idx !== i) })
+              }
+              className="press text-red-600 font-bold text-lg px-1"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setSettings({ ...settings, footer_links: [...(settings.footer_links ?? []), { label: "", url: "" }] })}
+          className="press w-full bg-teal-tint text-teal-dark text-sm font-bold py-2.5 rounded-xl"
+        >
+          + নতুন লিংক যোগ করুন
+        </button>
+      </div>
 
       <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">{t("deliveryCharges")}</div>
       <div className="grid grid-cols-2 gap-3">

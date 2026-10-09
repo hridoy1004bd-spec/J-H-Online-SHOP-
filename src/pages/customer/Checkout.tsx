@@ -13,12 +13,26 @@ import { money, formatDate } from "../../utils/format";
 import type { Order, PaymentMethod } from "../../types";
 
 type Step = "identify" | "otp" | "address" | "placing" | "success";
-type PayTab = "cod" | "bkash" | "nagad" | "wallet";
+type PayTab = string; // "cod" | "wallet" | payment_methods.key
+
+interface PayMethodRow {
+  key: string;
+  label_en: string;
+  label_bn: string;
+  number: string | null;
+  note_en: string | null;
+  note_bn: string | null;
+  qr_url: string | null;
+  color: string | null;
+}
+
+const DEFAULT_METHODS: PayMethodRow[] = [
+  { key: "bkash", label_en: "bKash", label_bn: "বিকাশ", number: "01880176772", note_en: null, note_bn: null, qr_url: null, color: "#E2136E" },
+  { key: "nagad", label_en: "Nagad", label_bn: "নগদ", number: "01856191004", note_en: null, note_bn: null, qr_url: null, color: "#F6921E" }
+];
 type LoginMode = "login" | "signup";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
-const BKASH_NUMBER = "01880176772";
-const NAGAD_NUMBER = "01856191004";
 const DELIVERY_CHARGE = 120;
 
 function mobileToInternalEmail(mobile: string): string {
@@ -126,6 +140,18 @@ export default function Checkout() {
   const [clientToken] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [methods, setMethods] = useState<PayMethodRow[]>(DEFAULT_METHODS);
+
+  useEffect(() => {
+    supabase
+      .from("payment_methods")
+      .select("key,label_en,label_bn,number,note_en,note_bn,qr_url,color")
+      .eq("is_enabled", true)
+      .order("sort_order")
+      .then(({ data }) => {
+        if (data && data.length > 0) setMethods(data as PayMethodRow[]);
+      });
+  }, []);
 
   useEffect(() => {
     async function loadWallet() {
@@ -144,7 +170,8 @@ export default function Checkout() {
   const total = subtotal + deliveryCharge;
   const isFullPrepay = payTab !== "cod" && payTab !== "wallet";
   const amountToSend = isFullPrepay ? total : deliveryCharge;
-  const payNumber = payTab === "nagad" ? NAGAD_NUMBER : BKASH_NUMBER;
+  const activeMethod = methods.find((m) => m.key === payTab) ?? null;
+  const methodName = activeMethod ? (lang === "bn" ? activeMethod.label_bn : activeMethod.label_en) : "";
   const referenceReady = paymentReference.trim().length >= 4;
   const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : (payTab as PaymentMethod);
   const walletSufficient = walletBalance >= total;
@@ -198,11 +225,6 @@ export default function Checkout() {
     }
     await refreshCustomer();
     setStep("address");
-  }
-
-  function copyNumber() {
-    navigator.clipboard?.writeText(payNumber);
-    showToast(lang === "en" ? "Number copied" : "নম্বর কপ হয়েছে", "success");
   }
 
   async function notifyTelegram(orderId: string) {
@@ -277,7 +299,7 @@ export default function Checkout() {
       showToast(
         lang === "en"
           ? "Please make the payment and enter the Transaction ID"
-          : "দয়া করে টাকা পঠিয়ে ট্রানজেকশন আইডি দিন",
+          : "দয়া করে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন",
         "error"
       );
       return;
@@ -320,7 +342,7 @@ export default function Checkout() {
         <div className="text-mute text-sm mb-6 whitespace-pre-line">
           {lang === "en"
             ? "Dear customer, we've received your order. Take a screenshot of your order and send it to us via the WhatsApp button below — we'll confirm it quickly once we see it. Thank you for shopping with us."
-            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির স্ক্রিনশট নিয়ে নচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
+            : "প্রিয় গ্রাহক, আপনার অর্ডারটি আমরা সফলভাবে পেয়েছি। আপনার পছন্দের পণ্যটির স্ক্রিনশট নিয়ে নিচের WhatsApp বাটনে ক্লিক করে আমাদের কাছে পাঠিয়ে দিন। আপনার পাঠানো স্ক্রিনশট দেখে আমরা দ্রুত আপনার পণ্যটি নিশ্চিত করব।\n\nধন্যবাদ আমাদের সাথে থাকার জন্য। ❤️"}
         </div>
         <div className="w-full bg-white border border-border rounded-2xl p-4 text-left space-y-2">
           <Row label={t("orderId")} value={placedOrder.order_number} />
@@ -513,38 +535,37 @@ export default function Checkout() {
             <div className="text-xs text-ink/80">
               {lang === "en"
                 ? "Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days. Delivery charge ৳120 must always be paid in advance to confirm the order."
-                : "ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন। অর্ডার নিশ্চিত করতে ডেলিভারি চার্জ ৳১২০ সবসময় আগে পঠাতে হবে।"}
+                : "ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন। অর্ডার নিশ্চিত করতে ডেলিভারি চার্জ ৳১২০ সবসময় আগে পাঠাতে হবে।"}
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setPayTab("cod")}
-              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
+              className={`press text-[12px] font-bold py-3 rounded-xl border leading-tight ${
                 payTab === "cod" ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
               }`}
             >
-              {lang === "en" ? "COD" : "ক্যাশ অন ডেলিভারি"}
+              {lang === "en" ? "Cash on Delivery" : "ক্যাশ অন ডেলিভারি"}
             </button>
-            <button
-              onClick={() => setPayTab("bkash")}
-              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
-                payTab === "bkash" ? "bg-[#E2136E] text-white border-[#E2136E]" : "bg-white text-ink border-border"
-              }`}
-            >
-              {lang === "en" ? "bKash" : "বিকাশ"}
-            </button>
-            <button
-              onClick={() => setPayTab("nagad")}
-              className={`press text-[11px] font-bold py-2.5 rounded-xl border ${
-                payTab === "nagad" ? "bg-[#F6921E] text-white border-[#F6921E]" : "bg-white text-ink border-border"
-              }`}
-            >
-              {lang === "en" ? "Nagad" : "নগদ"}
-            </button>
+            {methods.map((m) => {
+              const active = payTab === m.key;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => setPayTab(m.key)}
+                  style={active && m.color ? { backgroundColor: m.color, borderColor: m.color } : undefined}
+                  className={`press text-[12px] font-bold py-3 rounded-xl border leading-tight ${
+                    active ? "text-white" : "bg-white text-ink border-border"
+                  }`}
+                >
+                  {lang === "bn" ? m.label_bn : m.label_en}
+                </button>
+              );
+            })}
             <button
               onClick={() => setPayTab("wallet")}
-              className={`press text-[11px] font-bold py-2.5 rounded-xl border flex flex-col items-center gap-0.5 ${
+              className={`press text-[12px] font-bold py-3 rounded-xl border flex flex-col items-center gap-0.5 ${
                 payTab === "wallet" ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
               }`}
             >
@@ -583,26 +604,47 @@ export default function Checkout() {
               <div className="text-[11px] text-mute -mt-2">
                 {payTab === "cod"
                   ? lang === "en"
-                    ? `Pay only the delivery charge (${money(deliveryCharge)}) now via bKash/Nagad below. Pay the product price (${money(subtotal)}) in cash to the delivery man.`
-                    : `শুধু ডেলিভারি চার্জ (${money(deliveryCharge)}) এখন নিচের বিকাশ/নগদ নম্বরে পাঠান। পণ্যের দাম (${money(subtotal)}) ডেলিভারি ম্যানকে ক্যাশে দেবেন।`
+                    ? `Pay only the delivery charge (${money(deliveryCharge)}) now using one of the methods above (e.g. ${methods.map((m) => m.label_en).join(" / ")}). Pay the product price (${money(subtotal)}) in cash to the delivery man.`
+                    : `শুধু ডেলিভারি চার্জ (${money(deliveryCharge)}) এখন উপরের যেকোনো পদ্ধতিতে (${methods.map((m) => m.label_bn).join(" / ")}) পাঠান। পণ্যের দাম (${money(subtotal)}) ডেলিভারি ম্যানকে ক্যাশে দেবেন।`
                   : lang === "en"
-                  ? `Pay the full amount (${money(total)}) now via ${payTab === "nagad" ? "Nagad" : "bKash"}. Nothing to pay at delivery.`
-                  : `পুরো টাকা (${money(total)}) এখনই ${payTab === "nagad" ? "নগদ" : "বিকাশ"}-এ পাঠান। ডেলিভারির সময় আর কিছু দিতে হবে না।`}
+                  ? `Pay the full amount (${money(total)}) now via ${methodName}. Nothing to pay at delivery.`
+                  : `পুরো টাকা (${money(total)}) এখনই ${methodName}-এ পাঠান। ডেলিভারির সময় আর কিছু দিতে হবে না।`}
               </div>
 
-              <div className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
-                <div className="text-xs text-mute">
-                  {lang === "en" ? "Send the amount to:" : "টাকা এই নম্বরে পাঠান:"}
+              {(payTab === "cod" ? methods : activeMethod ? [activeMethod] : []).map((m) => (
+                <div key={m.key} className="bg-orange-tint border border-orange/20 rounded-xl p-3 space-y-2">
+                  <div className="text-sm font-extrabold" style={{ color: m.color ?? undefined }}>
+                    {lang === "bn" ? m.label_bn : m.label_en}
+                  </div>
+                  {m.qr_url && (
+                    <img src={m.qr_url} alt="QR" className="w-40 h-40 rounded-xl bg-white p-2 object-contain border border-border" />
+                  )}
+                  {m.number && (
+                    <>
+                      <div className="text-xs text-mute">
+                        {lang === "en" ? "Send the amount to:" : "টাকা এই নম্বরে পাঠান:"}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-lg text-ink tracking-wide">{m.number}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(m.number ?? "");
+                            showToast(lang === "en" ? "Number copied" : "নম্বর কপি হয়েছে", "success");
+                          }}
+                          className="press flex items-center gap-1 text-xs font-bold text-teal-dark bg-white px-3 py-1.5 rounded-full"
+                        >
+                          <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {(lang === "bn" ? m.note_bn : m.note_en) && (
+                    <div className="text-[11px] text-mute">{lang === "bn" ? m.note_bn : m.note_en}</div>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-lg text-ink tracking-wide">{payNumber}</span>
-                  <button onClick={copyNumber} className="press flex items-center gap-1 text-xs font-bold text-teal-dark bg-white px-3 py-1.5 rounded-full">
-                    <Copy size={13} /> {lang === "en" ? "Copy" : "কপি"}
-                  </button>
-                </div>
-                <div className="text-sm font-bold text-ink">
-                  {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
-                </div>
+              ))}
+              <div className="text-sm font-bold text-ink">
+                {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
               </div>
 
               <Field label={lang === "en" ? "Transaction ID" : "ট্রানজেকশন আইডি"}>

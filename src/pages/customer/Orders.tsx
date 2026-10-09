@@ -95,9 +95,15 @@ export default function Orders() {
 
             <div className="mt-3 space-y-1 border-t border-border pt-2">
               {order.order_items?.slice(0, 3).map((item) => (
-                <div key={item.id} className="text-xs text-ink/70 flex justify-between">
-                  <span className="truncate pr-2">
-                    {item.product_name} × {item.quantity}
+                <div key={item.id} className="text-xs text-ink/70 flex items-center gap-2">
+                  {item.product_variants?.image_url ? (
+                    <img src={item.product_variants.image_url} alt="" className="w-11 h-11 rounded-lg object-cover border border-border shrink-0" />
+                  ) : null}
+                  <span className="flex-1 min-w-0 pr-2">
+                    <span className="block truncate">{item.product_name} × {item.quantity}</span>
+                    {(item.size || item.color) && (
+                      <span className="block text-mute">{[item.size, item.color].filter(Boolean).join(" · ")}</span>
+                    )}
                   </span>
                   <span className="shrink-0">{money(item.line_total)}</span>
                 </div>

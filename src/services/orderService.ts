@@ -48,7 +48,7 @@ export const orderService = {
   async myOrders() {
     const { data, error } = await supabase
       .from("orders")
-      .select("*, order_items(*)")
+      .select("*, order_items(*, product_variants(image_url))")
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []) as Order[];

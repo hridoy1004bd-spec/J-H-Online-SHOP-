@@ -36,6 +36,7 @@ export interface ProductVariant {
   product_id: string;
   size: string | null;
   color: string | null;
+  image_url?: string | null;
 }
 
 export interface InventoryRow {
@@ -102,6 +103,7 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   line_total: number;
+  product_variants?: { image_url: string | null } | null;
 }
 
 export interface Order {

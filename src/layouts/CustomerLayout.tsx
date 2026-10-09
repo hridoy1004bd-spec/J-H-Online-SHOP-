@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import Header from "../components/Header";
 import BottomNav from "../components/BottomNav";
+import Footer from "../components/Footer";
 
 export default function CustomerLayout() {
   return (
@@ -9,6 +10,7 @@ export default function CustomerLayout() {
       <Header />
       <main className="flex-1 pb-20">
         <Outlet />
+        <Footer />
       </main>
       <BottomNav />
     </div>

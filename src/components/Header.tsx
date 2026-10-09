@@ -71,15 +71,20 @@ export default function Header() {
         <button onClick={() => setCatOpen(true)} className="press shrink-0 -ml-0.5" aria-label="Categories">
           <LayoutGrid size={22} />
         </button>
-        <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer min-w-0 flex-1">
-          <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center overflow-hidden shrink-0">
+        <div onClick={() => navigate("/")} className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1">
+          <div className="w-11 h-11 rounded-full bg-white ring-2 ring-white/40 shadow-md flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
               <img src={logoUrl} alt={storeName} className="w-full h-full object-cover" />
             ) : (
-              <ShoppingBag size={18} />
+              <ShoppingBag size={20} className="text-teal" />
             )}
           </div>
-          <span className="font-extrabold text-[13.5px] leading-tight whitespace-nowrap">{storeName || t("appName")}</span>
+          <div className="min-w-0">
+            <div className="font-extrabold text-[15px] leading-tight tracking-wide text-white drop-shadow-sm line-clamp-2">
+              {storeName || t("appName")}
+            </div>
+            <div className="mt-0.5 h-0.5 w-8 rounded-full bg-orange" />
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

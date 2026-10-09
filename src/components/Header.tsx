@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, User, ShoppingCart, ShoppingBag, Wallet, Menu, X, Eye, EyeOff } from "lucide-react";
+import { Search, User, ShoppingCart, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, LayoutGrid } from "lucide-react";
+import CategoryDrawer from "./CategoryDrawer";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../lib/supabase";
@@ -15,6 +16,7 @@ export default function Header() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showBalance, setShowBalance] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,7 +68,10 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-teal text-white overflow-visible">
       <div className="flex items-center justify-between gap-2 px-3 py-3">
-        <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer min-w-0">
+        <button onClick={() => setCatOpen(true)} className="press shrink-0 -ml-0.5" aria-label="Categories">
+          <LayoutGrid size={22} />
+        </button>
+        <div onClick={() => navigate("/")} className="flex items-center gap-1.5 cursor-pointer min-w-0 flex-1">
           <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
               <img src={logoUrl} alt={storeName} className="w-full h-full object-cover" />
@@ -163,6 +168,7 @@ export default function Header() {
           </button>
         </div>
       )}
+      <CategoryDrawer open={catOpen} onClose={() => setCatOpen(false)} />
     </header>
   );
 }

@@ -22,6 +22,7 @@ export default function ProductDetails() {
   const [activeImg, setActiveImg] = useState(0);
   const [size, setSize] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +36,7 @@ export default function ProductDetails() {
         setActiveImg(0);
         setSize(null);
         setColor(null);
+        setPreviewUrl(null);
         setQty(1);
         return productService.getRelated(p.category_id, p.id);
       })
@@ -55,6 +57,8 @@ export default function ProductDetails() {
   const images = product.product_images?.length ? product.product_images : [];
   const sizes = [...new Set((product.product_variants ?? []).map((v) => v.size).filter(Boolean))] as string[];
   const colors = [...new Set((product.product_variants ?? []).map((v) => v.color).filter(Boolean))] as string[];
+  const colorImage = (c: string | null): string | null =>
+    c ? (product.product_variants ?? []).find((v) => v.color === c && v.image_url)?.image_url ?? null : null;
   const selectedVariant = (product.product_variants ?? []).find(
     (v) => (sizes.length === 0 || v.size === size) && (colors.length === 0 || v.color === color)
   );
@@ -67,6 +71,10 @@ export default function ProductDetails() {
       showToast(t("selectSize"), "error");
       return false;
     }
+    if (colors.length > 0 && !color) {
+      showToast(lang === "bn" ? "একটি রঙ বেছে নিন" : "Please select a color", "error");
+      return false;
+    }
     return true;
   }
 
@@ -76,7 +84,7 @@ export default function ProductDetails() {
       variantId,
       name_en: product!.name_en,
       name_bn: product!.name_bn,
-      image: images[0]?.url ?? null,
+      image: colorImage(color) ?? images[0]?.url ?? null,
       size,
       color,
       price: product!.current_price,
@@ -105,8 +113,8 @@ export default function ProductDetails() {
           <ArrowLeft size={18} />
         </button>
         <div className="aspect-square flex items-center justify-center overflow-hidden">
-          {images.length > 0 ? (
-            <img src={images[activeImg]?.url} alt={pick(product, "name")} className="w-full h-full object-cover" />
+          {previewUrl || images.length > 0 ? (
+            <img src={previewUrl ?? images[activeImg]?.url} alt={pick(product, "name")} className="w-full h-full object-cover" />
           ) : (
             <ShoppingBag className="text-teal/30" size={64} />
           )}
@@ -116,9 +124,12 @@ export default function ProductDetails() {
             {images.map((img, i) => (
               <button
                 key={img.id}
-                onClick={() => setActiveImg(i)}
+                onClick={() => {
+                  setActiveImg(i);
+                  setPreviewUrl(null);
+                }}
                 className={`w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 ${
-                  i === activeImg ? "border-teal" : "border-transparent"
+                  i === activeImg && !previewUrl ? "border-teal" : "border-transparent"
                 }`}
               >
                 <img src={img.thumbnail_url ?? img.url} className="w-full h-full object-cover" />
@@ -171,19 +182,40 @@ export default function ProductDetails() {
 
         {colors.length > 0 && (
           <div className="mt-4">
-            <div className="text-xs font-bold text-mute mb-2">{t("color")}</div>
+            <div className="text-xs font-bold text-mute mb-2">
+              {t("color")}
+              {color ? <span className="text-ink">: {color}</span> : null}
+            </div>
             <div className="flex gap-2 flex-wrap">
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className={`press px-4 py-1.5 rounded-lg text-sm font-semibold border ${
-                    color === c ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+              {colors.map((c) => {
+                const img = colorImage(c);
+                const active = color === c;
+                return img ? (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setColor(c);
+                      setPreviewUrl(img);
+                    }}
+                    className={`press w-16 h-16 rounded-xl overflow-hidden border-2 ${active ? "border-orange" : "border-border"}`}
+                  >
+                    <img src={img} alt={c} loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ) : (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setColor(c);
+                      setPreviewUrl(null);
+                    }}
+                    className={`press px-4 py-1.5 rounded-lg text-sm font-semibold border ${
+                      active ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

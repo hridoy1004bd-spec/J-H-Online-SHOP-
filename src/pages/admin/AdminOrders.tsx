@@ -29,7 +29,7 @@ export default function AdminOrders() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from("orders").select("*, order_items(*)").order("created_at", { ascending: false });
+    const { data } = await supabase.from("orders").select("*, order_items(*, product_variants(image_url))").order("created_at", { ascending: false });
     setOrders((data as Order[]) ?? []);
     setLoading(false);
   }
@@ -104,10 +104,22 @@ export default function AdminOrders() {
                 <div>{order.customer_name} · {order.customer_mobile}</div>
                 <div className="text-mute">{order.full_address}, {order.area}, {order.city}</div>
               </div>
-              <div className="text-xs text-mute mb-3 space-y-0.5">
+              <div className="text-xs text-mute mb-3 space-y-2">
                 {order.order_items?.map((it) => (
-                  <div key={it.id}>
-                    {it.product_name} × {it.quantity} {it.size ? `(${it.size})` : ""}
+                  <div key={it.id} className="flex items-center gap-2">
+                    {it.product_variants?.image_url ? (
+                      <img src={it.product_variants.image_url} alt="" className="w-12 h-12 rounded-lg object-cover border border-border shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-teal-tint shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-ink/80 font-semibold">{it.product_name} × {it.quantity}</div>
+                      <div>
+                        {it.size ? `${it.size}` : ""}
+                        {it.size && it.color ? " · " : ""}
+                        {it.color ? `${it.color}` : ""}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

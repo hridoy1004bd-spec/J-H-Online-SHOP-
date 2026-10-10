@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { productService } from "../../services/productService";
 import { loadCategoryImages } from "../../services/categoryImages";
@@ -87,6 +87,7 @@ export default function Categories() {
   }, [idsKey, categories.length]);
 
   async function loadMore() {
+    if (loadingMore) return;
     const next = page + 1;
     setLoadingMore(true);
     try {
@@ -97,6 +98,24 @@ export default function Categories() {
       setLoadingMore(false);
     }
   }
+
+  // স্ক্রল করে নিচে এলে নিজে নিজে আরো পণ্য লোড হবে
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  const hasMore = products.length < total;
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreRef.current();
+      },
+      { rootMargin: "400px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loading, products.length]);
 
   function choose(s: string | null) {
     if (s) setParams({ c: s });
@@ -138,61 +157,55 @@ export default function Categories() {
 
       {activeTop && (
         <>
-          <div className="px-4 mt-4 mb-2 font-extrabold text-[15px] text-ink">
-            {activeSub ? pick(activeSub, "name") : pick(activeTop, "name")}
-            <span className="text-xs font-semibold text-mute ml-2">({total})</span>
+      <div className="px-4 mt-4 mb-2 font-extrabold text-[15px] text-ink">
+        {activeSub ? pick(activeSub, "name") : activeTop ? pick(activeTop, "name") : ""}
+        <span className="text-xs font-semibold text-mute ml-2">({total})</span>
+      </div>
+
+      {kids.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto px-4 pb-3" style={{ scrollbarWidth: "none" }}>
+          <button
+            onClick={() => activeTop && choose(activeTop.slug)}
+            className={`press shrink-0 text-[12.5px] font-semibold px-4 py-2 rounded-full border ${
+              !activeSub ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
+            }`}
+          >
+            {lang === "bn" ? "সব" : "All"}
+          </button>
+          {kids.map((k) => (
+            <button
+              key={k.id}
+              onClick={() => choose(k.slug)}
+              className={`press shrink-0 text-[12.5px] font-semibold px-4 py-2 rounded-full border ${
+                activeSub?.id === k.id ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
+              }`}
+            >
+              {pick(k, "name")}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <ProductGridSkeleton count={6} />
+      ) : products.length === 0 ? (
+        <div className="text-center text-sm text-mute py-16 px-4">
+          {lang === "bn" ? "এই ক্যাটাগরিতে এখনো কোনো পণ্য নেই" : "No products in this category yet"}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-4">
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
           </div>
-
-          {kids.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto px-4 pb-3" style={{ scrollbarWidth: "none" }}>
-              <button
-                onClick={() => choose(activeTop.slug)}
-                className={`press shrink-0 text-[12.5px] font-semibold px-4 py-2 rounded-full border ${
-                  !activeSub ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
-                }`}
-              >
-                {lang === "bn" ? "সব" : "All"}
-              </button>
-              {kids.map((k) => (
-                <button
-                  key={k.id}
-                  onClick={() => choose(k.slug)}
-                  className={`press shrink-0 text-[12.5px] font-semibold px-4 py-2 rounded-full border ${
-                    activeSub?.id === k.id ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
-                  }`}
-                >
-                  {pick(k, "name")}
-                </button>
-              ))}
+          {hasMore && (
+            <div ref={sentinelRef} className="px-4 mt-4 py-4 text-center text-xs text-mute">
+              {loadingMore ? (lang === "bn" ? "লোড হচ্ছে..." : "Loading...") : ""}
             </div>
           )}
-
-          {loading ? (
-            <ProductGridSkeleton count={6} />
-          ) : products.length === 0 ? (
-            <div className="text-center text-sm text-mute py-16 px-4">
-              {lang === "bn" ? "এই ক্যাটাগরিতে এখনো কোনো পণ্য নেই" : "No products in this category yet"}
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-4">
-                {products.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
-              </div>
-              {products.length < total && (
-                <div className="px-4 mt-4">
-                  <button
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="press w-full bg-teal-tint text-teal-dark font-bold text-sm py-3 rounded-xl disabled:opacity-60"
-                  >
-                    {loadingMore ? (lang === "bn" ? "লোড হচ্ছে..." : "Loading...") : lang === "bn" ? "আরো পণ্য দেখুন" : "Load more"}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+        </>
+      )}
         </>
       )}
     </div>

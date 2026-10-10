@@ -18,6 +18,7 @@ export interface Category {
   name_en: string;
   name_bn: string;
   icon: string | null;
+  image_url?: string | null;
   sort_order: number;
   is_active: boolean;
 }

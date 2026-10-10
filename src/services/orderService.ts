@@ -1,5 +1,6 @@
 import { supabase, FUNCTIONS_URL } from "../lib/supabase";
 import type { CartLine, Order, PaymentMethod } from "../types";
+import { ORDER_ITEMS_SELECT } from "../utils/orderImage";
 
 export const orderService = {
   async createOrder(params: {
@@ -50,7 +51,7 @@ export const orderService = {
   async myOrders() {
     const { data, error } = await supabase
       .from("orders")
-      .select("*, order_items(*, product_variants(image_url))")
+      .select(ORDER_ITEMS_SELECT)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []) as Order[];

@@ -11,6 +11,7 @@ export default function Header() {
   const [storeName, setStoreName] = useState("J H Online SHOP");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -28,20 +29,31 @@ export default function Header() {
         if (data.logo_url) setLogoUrl(data.logo_url);
       });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
+    function loadWallet(userId: string | null) {
+      if (!userId) {
+        if (active) {
+          setLoggedIn(false);
+          setWalletBalance(null);
+        }
+        return;
+      }
+      if (active) setLoggedIn(true);
       supabase
         .from("wallets")
         .select("balance")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .maybeSingle()
         .then(({ data }) => {
-          if (active && data) setWalletBalance(Number(data.balance));
+          if (active) setWalletBalance(data ? Number(data.balance) : 0);
         });
-    });
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => loadWallet(session?.user.id ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => loadWallet(session?.user.id ?? null));
 
     return () => {
       active = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
 
@@ -90,7 +102,7 @@ export default function Header() {
             {lang === "bn" ? "EN" : "বাংলা"}
           </button>
 
-          {walletBalance !== null && (
+          {loggedIn && (
             <button
               onClick={() => setShowBalance((v) => !v)}
               className="press flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 bg-gradient-to-r from-orange to-[#FFA24C] shadow-md ring-1 ring-white/30"
@@ -100,7 +112,7 @@ export default function Header() {
                 <Wallet size={13} className="text-orange" />
               </span>
               <span className="text-[12px] font-extrabold text-white leading-none">
-                {showBalance ? `৳${walletBalance}` : "৳ ●●●"}
+                {showBalance ? `৳${walletBalance ?? 0}` : "৳ ●●●"}
               </span>
               {showBalance ? <EyeOff size={12} className="text-white/90" /> : <Eye size={12} className="text-white/90" />}
             </button>

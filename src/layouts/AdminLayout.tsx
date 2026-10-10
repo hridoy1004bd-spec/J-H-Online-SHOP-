@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  LayoutGrid,
   Plus,
   Package,
   ClipboardList,
@@ -33,6 +34,7 @@ export default function AdminLayout() {
   const links = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), end: true },
     { to: "/admin/products/new", icon: Plus, label: t("newProduct") },
+    { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি ম্যানেজ" },
     { to: "/admin/products", icon: Package, label: t("allProductsAdmin") },
     { to: "/admin/orders", icon: ClipboardList, label: t("orderMgmt") },
     { to: "/admin/customers", icon: Users2, label: t("customers") },

@@ -62,13 +62,16 @@ export default function Banners() {
   }
 
   async function toggleActive(b: Banner) {
-    await supabase.from("banners").update({ is_active: !b.is_active }).eq("id", b.id);
+    const { error } = await supabase.from("banners").update({ is_active: !b.is_active }).eq("id", b.id);
+    if (error) return showToast(error.message, "error");
     load();
   }
 
   async function remove(b: Banner) {
-    if (!confirm(L("এই ব্যানারটি মুছে ফেলতে চন?", "Delete this banner?"))) return;
-    await supabase.from("banners").delete().eq("id", b.id);
+    if (!confirm(L("এই ব্যানারটি মুছে ফেলতে চান?", "Delete this banner?"))) return;
+    const { error } = await supabase.from("banners").delete().eq("id", b.id);
+    if (error) return showToast(error.message, "error");
+    showToast(L("ব্যানার মোছা হয়েছে", "Banner deleted"), "success");
     load();
   }
 
@@ -76,8 +79,9 @@ export default function Banners() {
     const idx = banners.findIndex((x) => x.id === b.id);
     const swapWith = banners[idx + dir];
     if (!swapWith) return;
-    await supabase.from("banners").update({ sort_order: swapWith.sort_order }).eq("id", b.id);
-    await supabase.from("banners").update({ sort_order: b.sort_order }).eq("id", swapWith.id);
+    const r1 = await supabase.from("banners").update({ sort_order: swapWith.sort_order }).eq("id", b.id);
+    const r2 = await supabase.from("banners").update({ sort_order: b.sort_order }).eq("id", swapWith.id);
+    if (r1.error || r2.error) return showToast((r1.error || r2.error)!.message, "error");
     load();
   }
 

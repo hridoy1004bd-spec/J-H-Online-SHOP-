@@ -9,7 +9,7 @@ export type OrderStatus =
   | "cancelled"
   | "returned";
 
-export type PaymentMethod = "cod" | "bkash" | "nagad" | "rocket" | "card";
+export type PaymentMethod = "cod" | "bkash" | "nagad" | "rocket" | "card" | "wallet";
 
 export interface Category {
   id: string;
@@ -122,6 +122,11 @@ export interface Order {
   total: number;
   payment_method: PaymentMethod;
   payment_status: string;
+  payment_reference?: string | null;
+  pay_kind?: string | null; // delivery_only | full | wallet
+  paid_via?: string | null; // bkash | nagad | rocket | card
+  paid_amount?: number | null;
+  charge_verified?: boolean;
   status: OrderStatus;
   created_at: string;
   order_items?: OrderItem[];

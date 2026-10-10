@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, MessageCircle, Copy, Truck, Wallet, Eye, EyeOff } from "lucide-react";
+import { CheckCircle2, MessageCircle, Copy, Truck, Wallet, Eye, EyeOff, Banknote, Smartphone } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -33,7 +33,6 @@ const DEFAULT_METHODS: PayMethodRow[] = [
 type LoginMode = "login" | "signup";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
-const DELIVERY_CHARGE = 120;
 const VIA_NAMES: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket", card: "Card" };
 
 function mobileToInternalEmail(mobile: string): string {
@@ -85,6 +84,9 @@ function buildOrderWhatsappMessage(order: Order): string {
   if (order.payment_method === "wallet") {
     lines.push(`Payment: PAID in full from Wallet (TK ${total})`);
     lines.push("Pay on delivery: TK 0");
+  } else if (order.pay_kind === "on_delivery") {
+    lines.push("Payment: Cash on Delivery (nothing paid in advance)");
+    lines.push(`Pay on delivery: TK ${total}`);
   } else if (order.pay_kind === "full" || (order.payment_method !== "cod" && order.pay_kind == null)) {
     lines.push(`Payment: PAID in full via ${via} (TK ${total})${ref}`);
     lines.push("Pay on delivery: TK 0");
@@ -145,7 +147,12 @@ export default function Checkout() {
 
   const [fullAddress, setFullAddress] = useState("");
   const [area, setArea] = useState("");
+  const [zone, setZone] = useState<"inside" | "outside">("inside");
   const [city, setCity] = useState("Dhaka");
+  const [feeInside, setFeeInside] = useState(80);
+  const [feeOutside, setFeeOutside] = useState(120);
+  const [deliveryMode, setDeliveryMode] = useState<"advance" | "on_delivery" | "free">("advance");
+  const [freeMin, setFreeMin] = useState(0);
   const [landmark, setLandmark] = useState("");
   const [payTab, setPayTab] = useState<PayTab>("cod");
   const [paymentReference, setPaymentReference] = useState("");
@@ -169,6 +176,21 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
+    supabase
+      .from("store_settings")
+      .select("delivery_charge_inside_dhaka, delivery_charge_outside_dhaka, delivery_mode, free_delivery_min")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setFeeInside(Number(data.delivery_charge_inside_dhaka ?? 80));
+        setFeeOutside(Number(data.delivery_charge_outside_dhaka ?? 120));
+        setDeliveryMode(((data as any).delivery_mode ?? "advance") as "advance" | "on_delivery" | "free");
+        setFreeMin(Number((data as any).free_delivery_min ?? 0));
+      });
+  }, []);
+
+  useEffect(() => {
     async function loadWallet() {
       if (!customer?.auth_user_id) return;
       const { data } = await supabase
@@ -181,14 +203,19 @@ export default function Checkout() {
     loadWallet();
   }, [customer?.auth_user_id]);
 
-  const deliveryCharge = DELIVERY_CHARGE;
+  const baseCharge = zone === "inside" ? feeInside : feeOutside;
+  const isFreeDelivery = deliveryMode === "free" || (freeMin > 0 && subtotal >= freeMin);
+  const deliveryCharge = isFreeDelivery ? 0 : baseCharge;
   const total = subtotal + deliveryCharge;
+  // ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে দিতে হবে কি না (অ্যাডমিন সেটিংস থেকে)
+  const codNeedsAdvance = deliveryMode === "advance" && deliveryCharge > 0;
   const isFullPrepay = payTab !== "cod" && payTab !== "wallet";
   const amountToSend = isFullPrepay ? total : deliveryCharge;
   const activeMethod = methods.find((m) => m.key === payTab) ?? null;
   const methodName = activeMethod ? (lang === "bn" ? activeMethod.label_bn : activeMethod.label_en) : "";
-  const viaReady = payTab !== "cod" || paidVia !== "";
-  const referenceReady = paymentReference.trim().length >= 4 && viaReady;
+  const needsProof = payTab !== "wallet" && (payTab !== "cod" || codNeedsAdvance);
+  const viaReady = payTab !== "cod" || !codNeedsAdvance || paidVia !== "";
+  const referenceReady = !needsProof || (paymentReference.trim().length >= 4 && viaReady);
   const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : (payTab as PaymentMethod);
   const walletSufficient = walletBalance >= total;
 
@@ -338,8 +365,8 @@ export default function Checkout() {
       city,
       landmark,
       paymentMethod,
-      paymentReference: paymentReference.trim(),
-      paidVia: payTab === "cod" ? paidVia : undefined,
+      paymentReference: needsProof ? paymentReference.trim() : "",
+      paidVia: payTab === "cod" && codNeedsAdvance ? paidVia : undefined,
       clientToken
     });
     if (!res.success || !res.order) {
@@ -528,19 +555,52 @@ export default function Checkout() {
           <Field label={t("fullAddress")}>
             <input value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="input" />
           </Field>
+          <div>
+            <label className="text-xs font-bold text-mute mb-1.5 block">{lang === "en" ? "Delivery Area" : "ডেলিভারি এলাকা"}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  ["inside", lang === "en" ? "Inside Dhaka" : "ঢাকার ভেতর", feeInside],
+                  ["outside", lang === "en" ? "Outside Dhaka" : "ঢাকার বাইরে", feeOutside]
+                ] as const
+              ).map(([z, label, fee]) => {
+                const on = zone === z;
+                return (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => {
+                      setZone(z);
+                      setCity(z === "inside" ? "Dhaka" : city === "Dhaka" || !city ? "Cumilla" : city);
+                    }}
+                    className={`press rounded-xl border py-3 text-center leading-tight ${
+                      on ? "bg-orange text-white border-orange shadow-md" : "bg-teal-tint text-ink border-transparent"
+                    }`}
+                  >
+                    <div className="text-[13px] font-extrabold">{label}</div>
+                    <div className={`text-[12px] font-bold ${on ? "text-white/90" : "text-mute"}`}>
+                      {isFreeDelivery ? (lang === "en" ? "Free" : "ফ্রি") : `(${money(fee)})`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex gap-3">
             <Field label={t("area")} className="flex-1">
               <input value={area} onChange={(e) => setArea(e.target.value)} className="input" />
             </Field>
-            <Field label={t("city")} className="flex-1">
-              <select value={city} onChange={(e) => setCity(e.target.value)} className="input">
-                {BD_DISTRICTS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {zone === "outside" && (
+              <Field label={lang === "en" ? "District" : "জেলা"} className="flex-1">
+                <select value={city} onChange={(e) => setCity(e.target.value)} className="input">
+                  {BD_DISTRICTS.filter((d) => d !== "Dhaka").map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
           <Field label={t("landmark")}>
             <input value={landmark} onChange={(e) => setLandmark(e.target.value)} className="input" />
@@ -549,7 +609,7 @@ export default function Checkout() {
           <div className="bg-white border border-border rounded-2xl p-4 space-y-2">
             <div className="text-xs font-bold text-mute uppercase mb-1">{t("orderSummary")}</div>
             <Row label={t("subtotal")} value={money(subtotal)} />
-            <Row label={t("delivery")} value={money(deliveryCharge)} />
+            <Row label={t("delivery")} value={isFreeDelivery ? (lang === "en" ? "Free" : "ফ্রি") : money(deliveryCharge)} />
             <Row label={t("total")} value={money(total)} bold />
           </div>
 
@@ -560,43 +620,125 @@ export default function Checkout() {
             <Truck size={16} className="text-teal shrink-0 mt-0.5" />
             <div className="text-xs text-ink/80">
               {lang === "en"
-                ? "Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days. Delivery charge ৳120 must always be paid in advance to confirm the order."
-                : "ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন। অর্ডার নিশ্চিত করতে ডেলিভারি চার্জ ৳১২০ সবসময় আগে পাঠাতে হবে।"}
+                ? "Inside Dhaka: 2-3 days · Outside Dhaka: 3-5 days. "
+                : "ঢাকার ভিতরে: ২-৩ দিন · ঢাকার বাইরে: ৩-৫ দিন। "}
+              {isFreeDelivery
+                ? lang === "en"
+                  ? "Delivery is FREE for this order."
+                  : "এই অর্ডারে ডেলিভারি ফ্রি!"
+                : deliveryMode === "advance"
+                ? lang === "en"
+                  ? `Delivery charge ${money(deliveryCharge)} must be paid in advance to confirm cash-on-delivery orders.`
+                  : `ক্যাশ অন ডেলিভারিতে অর্ডার নিশ্চিত করতে ডেলিভারি চার্জ ${money(deliveryCharge)} আগে পাঠাতে হবে।`
+                : lang === "en"
+                ? "Nothing to pay now on cash-on-delivery."
+                : "ক্যাশ অন ডেলিভারিতে এখন কিছু দিতে হবে না।"}
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2">
+            {/* ১) ক্যাশ অন ডেলিভারি */}
             <button
+              type="button"
               onClick={() => setPayTab("cod")}
-              className={`press text-[12px] font-bold py-3 rounded-xl border leading-tight ${
-                payTab === "cod" ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
+              className={`press w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 ${
+                payTab === "cod" ? "bg-orange text-white border-orange shadow-md" : "bg-white border-border"
               }`}
             >
-              {lang === "en" ? "Cash on Delivery" : "ক্যাশ অন ডেলিভারি"}
+              <span className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${payTab === "cod" ? "border-white" : "border-mute"}`}>
+                {payTab === "cod" && <span className="w-2.5 h-2.5 rounded-full bg-white" />}
+              </span>
+              <div>
+                <div className="flex items-center gap-1.5 text-[14px] font-extrabold">
+                  <Banknote size={16} /> {lang === "en" ? "Cash on Delivery" : "ক্যাশ অন ডেলিভারি"}
+                </div>
+                <div className={`text-[12px] mt-0.5 ${payTab === "cod" ? "text-white/90" : "text-mute"}`}>
+                  {isFreeDelivery
+                    ? lang === "en"
+                      ? "Free delivery · pay the product price when you receive it"
+                      : "ডেলিভারি ফ্রি · পণ্য হাতে পেয়ে দাম দিন"
+                    : deliveryMode === "advance"
+                    ? lang === "en"
+                      ? `Pay delivery charge ${money(deliveryCharge)} now, the rest on delivery`
+                      : `ডেলিভারি চার্জ ${money(deliveryCharge)} এখন দিন, বাকি টাকা পণ্য হাতে পেয়ে`
+                    : lang === "en"
+                    ? "Pay everything when you receive your order"
+                    : "পণ্য হাতে পেয়ে সব টাকা দিন"}
+                </div>
+              </div>
             </button>
-            {methods.map((m) => {
-              const active = payTab === m.key;
-              return (
-                <button
-                  key={m.key}
-                  onClick={() => setPayTab(m.key)}
-                  style={active && m.color ? { backgroundColor: m.color, borderColor: m.color } : undefined}
-                  className={`press text-[12px] font-bold py-3 rounded-xl border leading-tight ${
-                    active ? "text-white" : "bg-white text-ink border-border"
-                  }`}
-                >
-                  {lang === "bn" ? m.label_bn : m.label_en}
-                </button>
-              );
-            })}
+
+            {/* ২) অনলাইন পেমেন্ট */}
             <button
-              onClick={() => setPayTab("wallet")}
-              className={`press text-[12px] font-bold py-3 rounded-xl border flex flex-col items-center gap-0.5 ${
-                payTab === "wallet" ? "bg-orange text-white border-orange" : "bg-white text-ink border-border"
+              type="button"
+              onClick={() => {
+                if (payTab === "cod" || payTab === "wallet") setPayTab(methods[0]?.key ?? "bkash");
+              }}
+              className={`press w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 ${
+                isFullPrepay ? "bg-orange text-white border-orange shadow-md" : "bg-white border-border"
               }`}
             >
-              <Wallet size={13} />
-              {lang === "en" ? "Wallet" : "ওয়ালেট"}
+              <span className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isFullPrepay ? "border-white" : "border-mute"}`}>
+                {isFullPrepay && <span className="w-2.5 h-2.5 rounded-full bg-white" />}
+              </span>
+              <div>
+                <div className="flex items-center gap-1.5 text-[14px] font-extrabold">
+                  <Smartphone size={16} /> {lang === "en" ? "Online Payment" : "অনলাইন পেমেন্ট"}
+                </div>
+                <div className={`text-[12px] mt-0.5 ${isFullPrepay ? "text-white/90" : "text-mute"}`}>
+                  {lang === "en"
+                    ? `Pay full ${money(total)} via ${methods.map((m) => m.label_en).join(" / ")}`
+                    : `পুরো ${money(total)} ${methods.map((m) => m.label_bn).join(" / ")}-এ পাঠান`}
+                </div>
+              </div>
+            </button>
+            {isFullPrepay && (
+              <div className="flex gap-2 flex-wrap pl-2">
+                {methods.map((m) => {
+                  const on = payTab === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setPayTab(m.key)}
+                      style={on && m.color ? { backgroundColor: m.color, borderColor: m.color } : undefined}
+                      className={`press text-[12px] font-bold px-4 py-2 rounded-full border ${on ? "text-white" : "bg-white text-ink border-border"}`}
+                    >
+                      {lang === "bn" ? m.label_bn : m.label_en}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ৩) ওয়ালেট */}
+            <button
+              type="button"
+              onClick={() => setPayTab("wallet")}
+              className={`press w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 ${
+                payTab === "wallet" ? "bg-orange text-white border-orange shadow-md" : "bg-white border-border"
+              }`}
+            >
+              <span className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${payTab === "wallet" ? "border-white" : "border-mute"}`}>
+                {payTab === "wallet" && <span className="w-2.5 h-2.5 rounded-full bg-white" />}
+              </span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[14px] font-extrabold">
+                    <Wallet size={16} /> {lang === "en" ? "Wallet Balance" : "ওয়ালেট ব্যালেন্স"}
+                  </div>
+                  <span className="text-[14px] font-extrabold">{money(walletBalance)}</span>
+                </div>
+                <div className={`text-[12px] mt-0.5 ${payTab === "wallet" ? "text-white/90" : "text-mute"}`}>
+                  {walletSufficient
+                    ? lang === "en"
+                      ? "Pay the full amount from your wallet"
+                      : "ওয়ালেট থেকে পুরো টাকা পরিশোধ করুন"
+                    : lang === "en"
+                    ? "Not enough balance — add a gift card first"
+                    : "ব্যালেন্স যথেষ্ট নয় — আগে গিফট কার্ড যোগ করুন"}
+                </div>
+              </div>
             </button>
           </div>
 
@@ -624,6 +766,16 @@ export default function Checkout() {
                     : `${money(total)} সাথে সাথে আপনার ওয়ালেট থেকে কেটে নেওয়া হবে।`}
                 </div>
               )}
+            </div>
+          ) : payTab === "cod" && !codNeedsAdvance ? (
+            <div className="bg-teal-tint border border-teal/20 rounded-xl p-3 text-xs text-teal-dark font-semibold">
+              {isFreeDelivery
+                ? lang === "en"
+                  ? `Free delivery! Pay ${money(total)} in cash when you receive the product.`
+                  : `ডেলিভারি ফ্রি! পণ্য হাতে পেয়ে ${money(total)} ক্যাশে দিন।`
+                : lang === "en"
+                ? `Pay ${money(total)} (product + delivery charge) in cash when you receive the product.`
+                : `পণ্য হাতে পেয়ে ${money(total)} (পণ্য + ডেলিভারি চার্জ) ক্যাশে দিন।`}
             </div>
           ) : (
             <>

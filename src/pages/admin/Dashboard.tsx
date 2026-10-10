@@ -248,9 +248,12 @@ function OrderCard({ order, lang }: { order: OrderRow; lang: "en" | "bn" }) {
   const full = paidAmt >= total;
   const viaKey = order.paid_via ?? (order.payment_method !== "cod" && order.payment_method !== "wallet" ? order.payment_method : null);
   const via = viaKey ? VIA_NAMES[viaKey] ?? viaKey : null;
+  const noAdvance = order.pay_kind === "on_delivery";
   const badge =
     order.payment_method === "wallet"
       ? lang === "en" ? "Wallet paid" : "ওয়ালেটে পরিশোধ"
+      : noAdvance
+      ? lang === "en" ? "Pay on delivery" : "ডেলিভারিতে পরিশোধ"
       : full
       ? lang === "en" ? "Fully paid" : "পুরো পেমেন্ট"
       : lang === "en" ? "Delivery charge paid" : "ডেলিভারি চার্জ দেওয়া";
@@ -260,7 +263,7 @@ function OrderCard({ order, lang }: { order: OrderRow; lang: "en" | "bn" }) {
         <span className="text-sm font-bold">{order.order_number}</span>
         <span
           className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-            deliveryOnly ? "bg-orange-tint text-orange" : "bg-teal-tint text-teal-dark"
+            noAdvance ? "bg-red-50 text-red-600" : deliveryOnly ? "bg-orange-tint text-orange" : "bg-teal-tint text-teal-dark"
           }`}
         >
           <CheckCircle2 size={11} />

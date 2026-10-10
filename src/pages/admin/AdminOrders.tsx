@@ -7,6 +7,7 @@ import { money, formatDate } from "../../utils/format";
 import { EmptyState } from "../../components/EmptyState";
 import { LineSkeleton } from "../../components/LoadingSkeleton";
 import type { Order, OrderStatus } from "../../types";
+import { orderItemImage, ORDER_ITEMS_SELECT } from "../../utils/orderImage";
 
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "returned"];
 
@@ -22,7 +23,7 @@ const STATUS_NOTIFICATION: Record<OrderStatus, { type: string; titleEn: string; 
 
 const VIA_NAMES: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket", card: "Card" };
 
-type PayKind = "wallet" | "full" | "delivery_only";
+type PayKind = "wallet" | "full" | "delivery_only" | "on_delivery";
 
 function payInfo(o: Order) {
   const total = Number(o.total);
@@ -31,7 +32,11 @@ function payInfo(o: Order) {
       ? "wallet"
       : (o.pay_kind as PayKind | null | undefined) ?? (o.payment_method === "cod" ? "delivery_only" : "full");
   const paid =
-    kind === "wallet" ? total : Number(o.paid_amount ?? (kind === "delivery_only" ? o.delivery_charge : total));
+    kind === "wallet"
+      ? total
+      : kind === "on_delivery"
+      ? 0
+      : Number(o.paid_amount ?? (kind === "delivery_only" ? o.delivery_charge : total));
   const viaKey = o.paid_via ?? (o.payment_method !== "cod" && o.payment_method !== "wallet" ? o.payment_method : null);
   const via = viaKey ? VIA_NAMES[viaKey] ?? viaKey : null;
   return { kind, paid, due: Math.max(0, total - paid), via, ref: o.payment_reference ?? null };
@@ -48,7 +53,7 @@ export default function AdminOrders() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from("orders").select("*, order_items(*, product_variants(image_url))").order("created_at", { ascending: false });
+    const { data } = await supabase.from("orders").select(ORDER_ITEMS_SELECT).order("created_at", { ascending: false });
     setOrders((data as Order[]) ?? []);
     setLoading(false);
   }
@@ -249,10 +254,10 @@ export default function AdminOrders() {
                     <div className="text-xs text-mute mb-3 space-y-2">
                       {order.order_items?.map((it) => (
                         <div key={it.id} className="flex items-center gap-2">
-                          {it.product_variants?.image_url ? (
-                            <img src={it.product_variants.image_url} alt="" className="w-12 h-12 rounded-lg object-cover border border-border shrink-0" />
+                          {orderItemImage(it) ? (
+                            <img src={orderItemImage(it) ?? ""} alt="" className="w-14 h-14 rounded-lg object-cover border border-border shrink-0" />
                           ) : (
-                            <div className="w-12 h-12 rounded-lg bg-teal-tint shrink-0" />
+                            <div className="w-14 h-14 rounded-lg bg-teal-tint shrink-0" />
                           )}
                           <div className="min-w-0">
                             <div className="text-ink/80 font-semibold">{it.product_name} × {it.quantity}</div>
@@ -268,19 +273,21 @@ export default function AdminOrders() {
 
                     <div
                       className={`rounded-xl p-3 mb-3 text-xs ${
-                        p.kind === "delivery_only" ? "bg-orange-tint" : "bg-teal-tint"
+                        p.kind === "delivery_only" ? "bg-orange-tint" : p.kind === "on_delivery" ? "bg-red-50" : "bg-teal-tint"
                       }`}
                     >
-                      <div className={`font-extrabold mb-1 ${p.kind === "delivery_only" ? "text-orange" : "text-teal-dark"}`}>
+                      <div className={`font-extrabold mb-1 ${p.kind === "delivery_only" ? "text-orange" : p.kind === "on_delivery" ? "text-red-600" : "text-teal-dark"}`}>
                         {p.kind === "wallet"
                           ? "ওয়ালেট থেকে পুরো টাকা পরিশোধ"
                           : p.kind === "full"
                           ? "পুরো টাকা অগ্রিম দিয়েছে"
+                          : p.kind === "on_delivery"
+                          ? "কোনো অগ্রিম নেই (ক্যাশ অন ডেলিভারি)"
                           : "শুধু ডেলিভারি চার্জ অগ্রিম দিয়েছে"}
                         {" · "}
                         {money(p.paid)}
                       </div>
-                      {p.kind !== "wallet" && (
+                      {p.kind !== "wallet" && p.kind !== "on_delivery" && (
                         <div className="text-ink/80">
                           মাধ্যম: <span className="font-bold">{p.via ?? "অজানা"}</span>
                           {" · TrxID: "}
@@ -290,7 +297,7 @@ export default function AdminOrders() {
                       <div className="text-ink/80 mt-0.5">
                         ডেলিভারির সময় নেবেন: <span className="font-extrabold">{money(p.due)}</span>
                       </div>
-                      {p.kind !== "wallet" && (
+                      {p.kind !== "wallet" && p.kind !== "on_delivery" && (
                         <button
                           onClick={() => toggleVerified(order)}
                           className={`press mt-2 flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full ${

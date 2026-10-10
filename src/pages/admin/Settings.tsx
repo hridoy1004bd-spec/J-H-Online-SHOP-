@@ -55,6 +55,8 @@ export default function Settings() {
         footer_links: (settings.footer_links ?? []).filter((l) => l.label.trim() && l.url.trim()),
         delivery_charge_inside_dhaka: settings.delivery_charge_inside_dhaka,
         delivery_charge_outside_dhaka: settings.delivery_charge_outside_dhaka,
+        delivery_mode: settings.delivery_mode ?? "advance",
+        free_delivery_min: Number(settings.free_delivery_min ?? 0),
         cod_enabled: settings.cod_enabled
       })
       .eq("id", 1);
@@ -179,6 +181,41 @@ export default function Settings() {
           />
         </Field>
       </div>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">ডেলিভারি নিয়ম (ক্যাশ অন ডেলিভারি অর্ডারে)</div>
+      <div className="space-y-2 mb-4">
+        {(
+          [
+            ["advance", "ডেলিভারি চার্জ আগে দিতে হবে", "কাস্টমার শুধু ডেলিভারি চার্জ বিকাশ/নগদে আগে পাঠাবে, পণ্যের দাম ডেলিভারিতে দেবে।"],
+            ["on_delivery", "সব টাকা ডেলিভারিতে", "আগে কিছু দিতে হবে না। ডেলিভারি চার্জসহ সব টাকা পণ্য হাতে পেয়ে দেবে।"],
+            ["free", "ডেলিভারি ফ্রি", "সব অর্ডারে ডেলিভারি চার্জ ০ টাকা। পণ্যের দাম ডেলিভারিতে দেবে।"]
+          ] as const
+        ).map(([val, title, sub]) => {
+          const on = (settings.delivery_mode ?? "advance") === val;
+          return (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setSettings({ ...settings, delivery_mode: val })}
+              className={`press w-full text-left rounded-xl border p-3 ${on ? "bg-teal-tint border-teal" : "bg-white border-border"}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-4 h-4 rounded-full border-2 ${on ? "border-teal bg-teal" : "border-mute"}`} />
+                <span className="text-sm font-extrabold">{title}</span>
+              </div>
+              <div className="text-[11px] text-mute mt-1 ml-6">{sub}</div>
+            </button>
+          );
+        })}
+      </div>
+      <Field label="এত টাকার বেশি অর্ডারে ডেলিভারি ফ্রি (০ = বন্ধ)">
+        <input
+          type="number"
+          value={settings.free_delivery_min ?? 0}
+          onChange={(e) => setSettings({ ...settings, free_delivery_min: Number(e.target.value) })}
+          className="input"
+        />
+      </Field>
 
       <label className="flex items-center gap-2 my-4">
         <input

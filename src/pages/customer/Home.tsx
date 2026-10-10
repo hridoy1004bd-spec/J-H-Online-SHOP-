@@ -3,8 +3,7 @@ import { productService } from "../../services/productService";
 import ProductCard from "../../components/ProductCard";
 import CategoryShowcase from "../../components/CategoryShowcase";
 import { loadCategoryImages } from "../../services/categoryImages";
-import BannerSlider from "../../components/BannerSlider";
-import FeaturedBannerSlider from "../../components/FeaturedBannerSlider";
+import HeroSlider from "../../components/HeroSlider";
 import NoticeTicker from "../../components/NoticeTicker";
 import RecentOrderNotice from "../../components/RecentOrderNotice";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
@@ -72,9 +71,8 @@ export default function Home() {
 
   return (
     <div className="pb-4">
-      <BannerSlider />
+      <HeroSlider />
       <NoticeTicker />
-      <FeaturedBannerSlider />
       <RecentOrderNotice />
 
       <CategoryShowcase categories={categories} images={catImages} />

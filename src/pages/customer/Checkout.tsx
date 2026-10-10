@@ -34,6 +34,7 @@ type LoginMode = "login" | "signup";
 
 const ADMIN_WHATSAPP_NUMBER = "8801856191004";
 const DELIVERY_CHARGE = 120;
+const VIA_NAMES: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket", card: "Card" };
 
 function mobileToInternalEmail(mobile: string): string {
   return `${mobile}@customers.jhonlineshop.internal`;
@@ -78,8 +79,21 @@ function buildOrderWhatsappMessage(order: Order): string {
   lines.push(`Subtotal: TK ${order.subtotal}`);
   lines.push(`Delivery Charge: TK ${order.delivery_charge}`);
   lines.push(`Total: TK ${order.total}`);
-  lines.push(`Payment Method: ${order.payment_method ?? "cod"}`);
-  lines.push(`Order Date: ${order.created_at ?? ""}`);
+  const via = order.paid_via ? VIA_NAMES[order.paid_via] ?? order.paid_via : order.payment_method;
+  const ref = order.payment_reference ? ` | TrxID: ${order.payment_reference}` : "";
+  const total = Number(order.total);
+  if (order.payment_method === "wallet") {
+    lines.push(`Payment: PAID in full from Wallet (TK ${total})`);
+    lines.push("Pay on delivery: TK 0");
+  } else if (order.pay_kind === "full" || (order.payment_method !== "cod" && order.pay_kind == null)) {
+    lines.push(`Payment: PAID in full via ${via} (TK ${total})${ref}`);
+    lines.push("Pay on delivery: TK 0");
+  } else {
+    const paid = Number(order.paid_amount ?? order.delivery_charge);
+    lines.push(`Payment: Delivery charge PAID via ${via} (TK ${paid})${ref}`);
+    lines.push(`Pay on delivery (product price): TK ${Math.max(0, total - paid)}`);
+  }
+  lines.push(`Order Date: ${new Date(order.created_at).toLocaleString("en-GB", { timeZone: "Asia/Dhaka" })}`);
   return lines.join("\n");
 }
 
@@ -135,6 +149,7 @@ export default function Checkout() {
   const [landmark, setLandmark] = useState("");
   const [payTab, setPayTab] = useState<PayTab>("cod");
   const [paymentReference, setPaymentReference] = useState("");
+  const [paidVia, setPaidVia] = useState("");
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [clientToken] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -172,7 +187,8 @@ export default function Checkout() {
   const amountToSend = isFullPrepay ? total : deliveryCharge;
   const activeMethod = methods.find((m) => m.key === payTab) ?? null;
   const methodName = activeMethod ? (lang === "bn" ? activeMethod.label_bn : activeMethod.label_en) : "";
-  const referenceReady = paymentReference.trim().length >= 4;
+  const viaReady = payTab !== "cod" || paidVia !== "";
+  const referenceReady = paymentReference.trim().length >= 4 && viaReady;
   const paymentMethod: PaymentMethod = payTab === "cod" ? "cod" : (payTab as PaymentMethod);
   const walletSufficient = walletBalance >= total;
 
@@ -295,6 +311,15 @@ export default function Checkout() {
       return;
     }
 
+    if (!viaReady) {
+      showToast(
+        lang === "en"
+          ? "Please select how you sent the delivery charge (bKash / Nagad)"
+          : "ডেলিভারি চার্জ কোন মাধ্যমে পাঠিয়েছেন তা বেছে নিন",
+        "error"
+      );
+      return;
+    }
     if (!referenceReady) {
       showToast(
         lang === "en"
@@ -314,6 +339,7 @@ export default function Checkout() {
       landmark,
       paymentMethod,
       paymentReference: paymentReference.trim(),
+      paidVia: payTab === "cod" ? paidVia : undefined,
       clientToken
     });
     if (!res.success || !res.order) {
@@ -646,6 +672,29 @@ export default function Checkout() {
               <div className="text-sm font-bold text-ink">
                 {lang === "en" ? "Amount to send:" : "পাঠাতে হবে:"} {money(amountToSend)}
               </div>
+
+              {payTab === "cod" && (
+                <Field label={lang === "en" ? "Which method did you send the delivery charge with?" : "ডেলিভারি চার্জ কোন মাধ্যমে পাঠালেন?"}>
+                  <div className="flex flex-wrap gap-2">
+                    {methods.map((m) => {
+                      const on = paidVia === m.key;
+                      return (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => setPaidVia(m.key)}
+                          style={on && m.color ? { backgroundColor: m.color, borderColor: m.color } : undefined}
+                          className={`press text-[12px] font-bold px-4 py-2 rounded-full border ${
+                            on ? "text-white" : "bg-white text-ink border-border"
+                          }`}
+                        >
+                          {lang === "bn" ? m.label_bn : m.label_en}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
 
               <Field label={lang === "en" ? "Transaction ID" : "ট্রানজেকশন আইডি"}>
                 <input

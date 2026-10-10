@@ -1,70 +1,31 @@
 import React, { useEffect, useState } from "react";
 import { productService } from "../../services/productService";
-import ProductCard from "../../components/ProductCard";
 import CategoryShowcase from "../../components/CategoryShowcase";
 import { loadCategoryImages } from "../../services/categoryImages";
 import HeroSlider from "../../components/HeroSlider";
 import NoticeTicker from "../../components/NoticeTicker";
 import RecentOrderNotice from "../../components/RecentOrderNotice";
-import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { ErrorState } from "../../components/EmptyState";
-import { useLanguage } from "../../i18n/LanguageContext";
-import type { Category, Product } from "../../types";
-
-function Section({ title, products }: { title: string; products: Product[] }) {
-  if (!products.length) return null;
-  return (
-    <section className="mt-6">
-      <div className="px-4 mb-3 flex items-center justify-between">
-        <h2 className="font-extrabold text-[15px] text-ink">{title}</h2>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-4">
-        {products.map((p) => (
-          <ProductCard key={p.id} product={p} />
-        ))}
-      </div>
-    </section>
-  );
-}
+import type { Category } from "../../types";
 
 export default function Home() {
-  const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
   const [catImages, setCatImages] = useState<Record<string, string>>({});
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [newArrivals, setNewArrivals] = useState<Product[]>([]);
-  const [bestSellers, setBestSellers] = useState<Product[]>([]);
-  const [featured, setFeatured] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   async function load() {
-    setLoading(true);
     setError(false);
     try {
-      const [cats, general, arrivals, best, feat] = await Promise.all([
-        productService.listCategories(),
-        productService.list({ pageSize: 12 }),
-        productService.list({ newArrivals: true, pageSize: 8 }),
-        productService.list({ bestSeller: true, pageSize: 8 }),
-        productService.list({ featured: true, pageSize: 8 })
-      ]);
-      setCategories(cats as Category[]);
-      loadCategoryImages(cats as Category[]).then(setCatImages).catch(() => {});
-      setAllProducts(general.products);
-      setNewArrivals(arrivals.products);
-      setBestSellers(best.products);
-      setFeatured(feat.products);
+      const cats = (await productService.listCategories()) as Category[];
+      setCategories(cats);
+      loadCategoryImages(cats).then(setCatImages).catch(() => {});
     } catch {
       setError(true);
-    } finally {
-      setLoading(false);
     }
   }
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) return <ErrorState onRetry={load} />;
@@ -77,17 +38,6 @@ export default function Home() {
       <RecentOrderNotice />
 
       <CategoryShowcase categories={categories} images={catImages} />
-
-      {loading ? (
-        <ProductGridSkeleton count={8} />
-      ) : (
-        <>
-          <Section title={t("featured")} products={featured} />
-          <Section title={t("newArrivals")} products={newArrivals} />
-          <Section title={t("bestSelling")} products={bestSellers} />
-          <Section title={t("recommended")} products={allProducts} />
-        </>
-      )}
     </div>
   );
 }

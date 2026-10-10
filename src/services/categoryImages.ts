@@ -2,7 +2,7 @@ import { supabase } from "../lib/supabase";
 import type { Category } from "../types";
 
 /**
- * প্রতিটি ক্যাটাগরির ছবি: ওই ক্যাটাগরির প্রথম পণ্যের ছবি।
+ * প্রতিটি ক্যাটাগরির ছবি: অ্যাডমিন নিজে ছবি দিলে সেটা, নয়তো ওই ক্যাটাগরির প্রথম পণ্যের ছবি।
  * মূল ক্যাটাগরির নিজের পণ্য না থাকলে তার সাব-ক্যাটাগরির ছবি নেয়।
  */
 export async function loadCategoryImages(categories: Category[]): Promise<Record<string, string>> {
@@ -16,6 +16,8 @@ export async function loadCategoryImages(categories: Category[]): Promise<Record
   if (error || !data) return {};
 
   const map: Record<string, string> = {};
+  // অ্যাডমিন যে ছবি নিজে দিয়েছে সেটাই আগে
+  for (const c of categories) if (c.image_url) map[c.id] = c.image_url;
   for (const row of data as any[]) {
     const cid = row.category_id as string;
     if (map[cid]) continue;

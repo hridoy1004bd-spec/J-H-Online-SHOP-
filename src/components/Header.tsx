@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, User, ShoppingCart, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, LayoutGrid } from "lucide-react";
-import CategoryDrawer from "./CategoryDrawer";
+import { Search, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, Globe } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
-import { useCart } from "../contexts/CartContext";
 import { supabase } from "../lib/supabase";
 
 export default function Header() {
   const { t, lang, setLang } = useLanguage();
-  const { itemCount } = useCart();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [storeName, setStoreName] = useState("J H Online SHOP");
@@ -16,7 +13,6 @@ export default function Header() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showBalance, setShowBalance] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [catOpen, setCatOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,9 +64,6 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-teal text-white overflow-visible">
       <div className="flex items-center justify-between gap-2 px-3 py-3">
-        <button onClick={() => setCatOpen(true)} className="press shrink-0 -ml-0.5" aria-label="Categories">
-          <LayoutGrid size={22} />
-        </button>
         <div onClick={() => navigate("/")} className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1">
           <div className="w-11 h-11 rounded-full bg-white ring-2 ring-white/40 shadow-md flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
@@ -88,28 +81,33 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setLang(lang === "bn" ? "en" : "bn")}
+            className="press flex items-center gap-1 bg-white/15 border border-white/25 rounded-full px-2.5 py-1.5 text-[11px] font-extrabold"
+            aria-label="Language"
+          >
+            <Globe size={13} />
+            {lang === "bn" ? "EN" : "বাংলা"}
+          </button>
+
           {walletBalance !== null && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowBalance((v) => !v);
-              }}
-              className="press flex items-center gap-1 bg-white/15 rounded-full px-2.5 py-1.5"
+              onClick={() => setShowBalance((v) => !v)}
+              className="press flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 bg-gradient-to-r from-orange to-[#FFA24C] shadow-md ring-1 ring-white/30"
+              aria-label="Wallet"
             >
-              <Wallet size={13} />
-              <span className="text-[11px] font-extrabold">
+              <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                <Wallet size={13} className="text-orange" />
+              </span>
+              <span className="text-[12px] font-extrabold text-white leading-none">
                 {showBalance ? `৳${walletBalance}` : "৳ ●●●"}
               </span>
+              {showBalance ? <EyeOff size={12} className="text-white/90" /> : <Eye size={12} className="text-white/90" />}
             </button>
           )}
 
-          <button onClick={() => setMenuOpen((v) => !v)} className="press relative">
+          <button onClick={() => setMenuOpen((v) => !v)} className="press" aria-label="Menu">
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
-            {itemCount > 0 && !menuOpen && (
-              <span className="absolute -top-1 -right-1 bg-orange text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {itemCount > 9 ? "9+" : itemCount}
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -125,55 +123,9 @@ export default function Header() {
               className="bg-transparent outline-none text-sm flex-1 min-w-0 ml-2"
             />
           </form>
-
-          {walletBalance !== null && (
-            <div className="flex items-center justify-between bg-orange-tint rounded-xl px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Wallet size={16} className="text-orange" />
-                <span className="text-sm font-bold">{lang === "en" ? "Wallet Balance" : "ওয়ালেট ব্যালেন্স"}</span>
-              </div>
-              <button
-                onClick={() => setShowBalance((v) => !v)}
-                className="press flex items-center gap-1.5 text-sm font-extrabold text-orange"
-              >
-                {showBalance ? `৳${walletBalance}` : "৳ ●●●"}
-                {showBalance ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              navigate("/account");
-              setMenuOpen(false);
-            }}
-            className="press w-full flex items-center gap-3 text-sm font-semibold py-2"
-          >
-            <User size={18} /> {t("account")}
-          </button>
-
-          <button
-            onClick={() => {
-              navigate("/cart");
-              setMenuOpen(false);
-            }}
-            className="press w-full flex items-center gap-3 text-sm font-semibold py-2"
-          >
-            <ShoppingCart size={18} /> {t("cart")}
-            {itemCount > 0 && (
-              <span className="bg-orange text-white text-[10px] font-bold rounded-full px-2 py-0.5">{itemCount}</span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setLang(lang === "bn" ? "en" : "bn")}
-            className="press w-full text-xs font-bold bg-teal-tint text-teal-dark rounded-full py-2.5"
-          >
-            {lang === "bn" ? "Switch to English" : "বাংলায় দেখুন"}
-          </button>
+          {/* নতুন ফিচার পরে এই মেনুতে যোগ হবে */}
         </div>
       )}
-      <CategoryDrawer open={catOpen} onClose={() => setCatOpen(false)} />
     </header>
   );
 }

@@ -10,6 +10,7 @@ export const orderService = {
     landmark?: string;
     paymentMethod: PaymentMethod;
     paymentReference?: string;
+    paidVia?: string;
     couponCode?: string;
     clientToken?: string;
   }) {
@@ -36,6 +37,7 @@ export const orderService = {
         landmark: params.landmark,
         paymentMethod: params.paymentMethod,
         paymentReference: params.paymentReference,
+        paidVia: params.paidVia,
         couponCode: params.couponCode,
         clientToken: params.clientToken
       })

@@ -105,6 +105,7 @@ export interface OrderItem {
   quantity: number;
   line_total: number;
   product_variants?: { image_url: string | null } | null;
+  products?: { product_images?: { url: string; thumbnail_url: string | null; is_main: boolean; sort_order: number }[] } | null;
 }
 
 export interface Order {
@@ -144,6 +145,8 @@ export interface StoreSettings {
   delivery_charge_outside_dhaka: number;
   cod_enabled: boolean;
   dev_otp_mode: boolean;
+  delivery_mode?: "advance" | "on_delivery" | "free";
+  free_delivery_min?: number;
 }
 
 // --- Client-side cart (persisted locally until checkout creates a real order) ---

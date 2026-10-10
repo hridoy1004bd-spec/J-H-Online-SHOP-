@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 interface Slide {
@@ -11,11 +11,11 @@ interface Slide {
 const AUTOPLAY_MS = 4000;
 
 /**
- * হোমের সব ব্যানার একটার পর একটা নিজে নিজে স্লাইড হয়।
- * অ্যাডমিন → ব্যানার ও ফিচার্ড ব্যানার থেকে যোগ/মোছা/বন্ধ করলে এখানে সাথে সাথে বদলায়।
+ * ব্যানার একটার পর একটা নিজে নিজে স্লাইড হয়, আঙুলে টেনেও সরানো যায়।
+ * table = "banners" (উপরের ব্যানার) অথবা "featured_banners" (নিচের অর্ডার ব্যানার, চাপলে পণ্যে যায়)।
+ * অ্যাডমিন থেকে যোগ/মোছা/বন্ধ করলে এখানে সাথে সাথে বদলায়।
  */
-export default function HeroSlider() {
-  const navigate = useNavigate();
+export default function HeroSlider({ table = "banners" }: { table?: "banners" | "featured_banners" }) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [idx, setIdx] = useState(0);
   const [ratios, setRatios] = useState<Record<string, number>>({});
@@ -24,18 +24,17 @@ export default function HeroSlider() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      supabase.from("banners").select("id, image_url, link_url").order("sort_order", { ascending: true }),
-      supabase.from("featured_banners").select("id, image_url, link_url").order("sort_order", { ascending: true })
-    ]).then(([a, b]) => {
-      if (!active) return;
-      const list = [...((a.data as Slide[]) ?? []), ...((b.data as Slide[]) ?? [])];
-      setSlides(list);
-    });
+    supabase
+      .from(table)
+      .select("id, image_url, link_url")
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => {
+        if (active) setSlides((data as Slide[]) ?? []);
+      });
     return () => {
       active = false;
     };
-  }, []);
+  }, [table]);
 
   // next slide every few seconds (restarts after every change, so a manual swipe gets a full pause)
   useEffect(() => {
@@ -53,16 +52,15 @@ export default function HeroSlider() {
     setIdx((i) => (i + delta + slides.length) % slides.length);
   }
 
-  function open(link: string | null) {
-    if (swiped.current || !link) return;
-    if (link.startsWith("/")) navigate(link);
-    else window.open(link, "_blank", "noopener");
+  // A swipe must never count as a tap on the link underneath.
+  function blockIfSwiped(e: React.MouseEvent) {
+    if (swiped.current) e.preventDefault();
   }
 
   return (
     <div className="mx-4 mt-4 rounded-2xl overflow-hidden relative shadow-sm bg-teal-tint">
       <div
-        className="overflow-hidden"
+        className="overflow-hidden relative"
         style={{ aspectRatio: String(ratio), transition: "aspect-ratio 0.3s ease" }}
         onTouchStart={(e) => {
           touchX.current = e.touches[0].clientX;
@@ -82,30 +80,54 @@ export default function HeroSlider() {
         }}
       >
         <div
-          className="flex h-full"
+          className="absolute inset-0 flex"
           style={{ transform: `translateX(-${idx * 100}%)`, transition: "transform 0.5s ease" }}
         >
-          {slides.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => open(s.link_url)}
-              className={`shrink-0 w-full h-full ${s.link_url ? "cursor-pointer" : ""}`}
-            >
+          {slides.map((s) => {
+            const img = (
               <img
                 src={s.image_url}
                 alt=""
                 className="w-full h-full object-cover block"
                 draggable={false}
                 onLoad={(e) => {
-                  const img = e.currentTarget;
-                  if (img.naturalWidth && img.naturalHeight) {
-                    const r = img.naturalWidth / img.naturalHeight;
+                  const el = e.currentTarget;
+                  if (el.naturalWidth && el.naturalHeight) {
+                    const r = el.naturalWidth / el.naturalHeight;
                     setRatios((prev) => (prev[s.id] === r ? prev : { ...prev, [s.id]: r }));
                   }
                 }}
               />
-            </div>
-          ))}
+            );
+            const cls = "block shrink-0 w-full h-full";
+            if (s.link_url && s.link_url.startsWith("/")) {
+              return (
+                <Link
+                  key={s.id}
+                  to={s.link_url}
+                  onClick={(e) => {
+                    blockIfSwiped(e);
+                    if (!swiped.current) window.scrollTo({ top: 0 });
+                  }}
+                  className={cls}
+                >
+                  {img}
+                </Link>
+              );
+            }
+            if (s.link_url) {
+              return (
+                <a key={s.id} href={s.link_url} target="_blank" rel="noreferrer" onClick={blockIfSwiped} className={cls}>
+                  {img}
+                </a>
+              );
+            }
+            return (
+              <div key={s.id} className={cls}>
+                {img}
+              </div>
+            );
+          })}
         </div>
       </div>
 

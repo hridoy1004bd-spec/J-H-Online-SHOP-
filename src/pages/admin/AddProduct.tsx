@@ -15,7 +15,7 @@ import type { Category } from "../../types";
  * can edit the result before publishing either way (see spec section 15).
  */
 function isBangla(text: string) {
-  return /[\u0980-\u09FF]/.test(text);
+  return /[ঀ-৿]/.test(text);
 }
 function autoTranslateLabel(text: string, targetIsBangla: boolean) {
   if (!text) return "";
@@ -26,7 +26,7 @@ function slugifyKeywords(nameEn: string, nameBn: string, brand: string, tags: st
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
-    .replace(/[^\w\s\u0980-\u09FF]/g, " ")
+    .replace(/[^\w\sঀ-৿]/g, " ")
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 20)
@@ -228,11 +228,22 @@ export default function AddProduct() {
       <Field label={t("category")}>
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
           <option value="">—</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {lang === "bn" ? c.name_bn : c.name_en}
-            </option>
-          ))}
+          {categories
+            .filter((t) => !t.parent_id)
+            .map((t) => {
+              const kids = categories.filter((k) => k.parent_id === t.id);
+              const nm = (c: Category) => (lang === "bn" ? c.name_bn : c.name_en);
+              return kids.length === 0 ? (
+                <option key={t.id} value={t.id}>{nm(t)}</option>
+              ) : (
+                <optgroup key={t.id} label={nm(t)}>
+                  <option value={t.id}>{nm(t)} — {lang === "bn" ? "সাধারণ" : "General"}</option>
+                  {kids.map((k) => (
+                    <option key={k.id} value={k.id}>{"   "}{nm(k)}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
         </select>
       </Field>
 

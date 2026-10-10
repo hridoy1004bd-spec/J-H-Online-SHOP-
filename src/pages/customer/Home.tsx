@@ -71,8 +71,9 @@ export default function Home() {
 
   return (
     <div className="pb-4">
-      <HeroSlider />
+      <HeroSlider table="banners" />
       <NoticeTicker />
+      <HeroSlider table="featured_banners" />
       <RecentOrderNotice />
 
       <CategoryShowcase categories={categories} images={catImages} />

@@ -29,6 +29,7 @@ import Support from "./pages/admin/Support";
 import Banners from "./pages/admin/Banners";
 import Notices from "./pages/admin/Notices";
 import FeaturedBanners from "./pages/admin/FeaturedBanners";
+import AdminCategories from "./pages/admin/AdminCategories";
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="banners" element={<Banners />} />
         <Route path="notices" element={<Notices />} />
         <Route path="featured-banners" element={<FeaturedBanners />} />
+        <Route path="categories" element={<AdminCategories />} />
       </Route>
     </Routes>
   );

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Package, CircleCheck, Clock, Truck, XCircle, Boxes } from "lucide-react";
+import { Package, CircleCheck, Clock, Truck, XCircle, Boxes, ShoppingBag } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { orderService } from "../../services/orderService";
 import { EmptyState } from "../../components/EmptyState";
 import { LineSkeleton } from "../../components/LoadingSkeleton";
 import { money, formatDate } from "../../utils/format";
+import { orderItemImage } from "../../utils/orderImage";
 import type { Order, OrderStatus } from "../../types";
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "confirmed", "processing", "shipped", "delivered"];
@@ -93,21 +94,42 @@ export default function Orders() {
               </div>
             )}
 
-            <div className="mt-3 space-y-1 border-t border-border pt-2">
-              {order.order_items?.slice(0, 3).map((item) => (
-                <div key={item.id} className="text-xs text-ink/70 flex items-center gap-2">
-                  {item.product_variants?.image_url ? (
-                    <img src={item.product_variants.image_url} alt="" className="w-11 h-11 rounded-lg object-cover border border-border shrink-0" />
-                  ) : null}
-                  <span className="flex-1 min-w-0 pr-2">
-                    <span className="block truncate">{item.product_name} × {item.quantity}</span>
-                    {(item.size || item.color) && (
-                      <span className="block text-mute">{[item.size, item.color].filter(Boolean).join(" · ")}</span>
-                    )}
-                  </span>
-                  <span className="shrink-0">{money(item.line_total)}</span>
-                </div>
-              ))}
+            <div className="mt-3 space-y-2.5 border-t border-border pt-3">
+              {order.order_items?.map((item) => {
+                const img = orderItemImage(item);
+                return (
+                  <div key={item.id} className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-xl bg-teal-tint border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                      {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <ShoppingBag size={20} className="text-teal/40" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-ink line-clamp-2">{item.product_name}</div>
+                      {(item.size || item.color) && (
+                        <div className="text-[11px] text-mute mt-0.5">{[item.size, item.color].filter(Boolean).join(" · ")}</div>
+                      )}
+                      <div className="text-[11px] text-mute mt-0.5">
+                        {item.quantity} × {money(item.unit_price ?? item.line_total)}
+                      </div>
+                    </div>
+                    <div className="shrink-0 font-extrabold text-sm text-ink">{money(item.line_total ?? Number(item.unit_price) * item.quantity)}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 border-t border-border pt-2 space-y-1 text-xs">
+              <div className="flex justify-between text-mute">
+                <span>{lang === "en" ? "Subtotal" : "পণ্যের দাম"}</span>
+                <span>{money(order.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-mute">
+                <span>{lang === "en" ? "Delivery" : "ডেলিভারি চার্জ"}</span>
+                <span>{Number(order.delivery_charge) === 0 ? (lang === "en" ? "Free" : "ফ্রি") : money(order.delivery_charge)}</span>
+              </div>
+              <div className="flex justify-between font-extrabold text-sm text-ink pt-1">
+                <span>{lang === "en" ? "Total" : "মোট"}</span>
+                <span className="text-teal-dark">{money(order.total)}</span>
+              </div>
             </div>
           </div>
         );

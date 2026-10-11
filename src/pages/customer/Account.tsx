@@ -67,6 +67,7 @@ export default function Account() {
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [giftCode, setGiftCode] = useState("");
+  const [dueTotal, setDueTotal] = useState(0);
   const [redeeming, setRedeeming] = useState(false);
 
   React.useEffect(() => {
@@ -82,8 +83,17 @@ export default function Account() {
         .maybeSingle();
       setWalletBalance(Number(data?.balance ?? 0));
     }
+    async function loadDues() {
+      if (!customer?.id) {
+        setDueTotal(0);
+        return;
+      }
+      const { data } = await supabase.from("customer_dues").select("amount, paid").eq("customer_id", customer.id).eq("status", "open");
+      setDueTotal((data ?? []).reduce((s: number, d: any) => s + (Number(d.amount) - Number(d.paid)), 0));
+    }
     loadWallet();
-  }, [customer?.auth_user_id]);
+    loadDues();
+  }, [customer?.auth_user_id, customer?.id]);
 
   function resetLoginForm() {
     setLoginStep("identify");
@@ -165,11 +175,15 @@ export default function Account() {
       showToast(data?.error || error?.message || (lang === "en" ? "Failed to redeem" : "রিডিম করা যায়নি"), "error");
       return;
     }
+    const ded = Number(data.due_deducted ?? 0);
     showToast(
-      lang === "en" ? `৳${data.amount} added to your wallet!` : `৳${data.amount} আপনার ওয়ালেটে যোগ হয়েছে!`,
+      lang === "en"
+        ? `৳${data.amount} added to your wallet!${ded > 0 ? ` (৳${ded} deducted for your due)` : ""}`
+        : `৳${data.amount} আপনার ওয়ালেটে যোগ হয়েছে!${ded > 0 ? ` (বকেয়া বাবদ ৳${ded} কাটা হয়েছে)` : ""}`,
       "success"
     );
     setWalletBalance(Number(data.new_balance));
+    if (ded > 0) setDueTotal((d) => Math.max(0, d - ded));
     setGiftCode("");
   }
 
@@ -208,6 +222,14 @@ export default function Account() {
             <Wallet size={14} className="text-teal" /> {lang === "en" ? "Wallet Balance" : "ওয়ালেট ব্যালেন্স"}
           </div>
           <div className="text-2xl font-extrabold text-teal-dark mb-3">{money(walletBalance)}</div>
+
+          {dueTotal > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 text-xs text-red-700 font-semibold">
+              {lang === "en"
+                ? `You have an outstanding due of ${money(dueTotal)}. It will be deducted automatically when you recharge or redeem a gift card.`
+                : `আপনার ${money(dueTotal)} বকেয়া আছে। ওয়ালেটে টাকা যোগ বা গিফট কার্ড রিডিম করলে এটি নিজে থেকেই কেটে নেওয়া হবে।`}
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 text-xs text-mute font-bold mb-2">
             <Gift size={14} className="text-orange" /> {lang === "en" ? "Redeem Gift Card" : "গিফট কার্ড রিডিম করুন"}

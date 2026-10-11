@@ -12,7 +12,9 @@ function timeAgoText(minutes: number, lang: "bn" | "en") {
   if (minutes < 1) return lang === "en" ? "just now" : "এইমাত্র";
   if (minutes < 60) return lang === "en" ? `${minutes} min ago` : `${minutes} মিনিট আগে`;
   const hours = Math.floor(minutes / 60);
-  return lang === "en" ? `${hours}h ago` : `${hours} ঘণ্টা আগে`;
+  if (hours < 24) return lang === "en" ? `${hours}h ago` : `${hours} ঘণ্টা আগে`;
+  const days = Math.floor(hours / 24);
+  return lang === "en" ? `${days} day${days > 1 ? "s" : ""} ago` : `${days} দিন আগে`;
 }
 
 export default function RecentOrderNotice() {
@@ -23,7 +25,11 @@ export default function RecentOrderNotice() {
 
   useEffect(() => {
     supabase.rpc("get_recent_order_cities", { limit_count: 10 }).then(({ data }) => {
-      if (data && data.length > 0) setRows(data as RecentOrderCity[]);
+      if (data && data.length > 0) {
+        // শুধু গত ৭ দিনের অর্ডার দেখাবে (পুরনো অর্ডার "এইমাত্র" এর মতো দেখালে বিভ্রান্তি হয়)
+        const recent = (data as RecentOrderCity[]).filter((r) => r.minutes_ago <= 7 * 24 * 60);
+        if (recent.length > 0) setRows(recent);
+      }
     });
   }, []);
 
@@ -61,7 +67,7 @@ export default function RecentOrderNotice() {
       </div>
       <div className="text-[11px] leading-snug">
         <div className="font-bold text-ink">
-          {lang === "en" ? `A customer from ${row.city} just ordered` : `${row.city} থেকে একজন কাস্টমার অর্ডার করেছেন`}
+          {lang === "en" ? `A customer from ${row.city} ordered` : `${row.city} থেকে একজন কাস্টমার অর্ডার করেছেন`}
         </div>
         <div className="text-mute">{timeAgoText(row.minutes_ago, lang)}</div>
       </div>

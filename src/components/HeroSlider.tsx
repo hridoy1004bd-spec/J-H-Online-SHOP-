@@ -27,6 +27,7 @@ export default function HeroSlider({ table = "banners" }: { table?: "banners" | 
     supabase
       .from(table)
       .select("id, image_url, link_url")
+      .eq("is_active", true)
       .order("sort_order", { ascending: true })
       .then(({ data }) => {
         if (active) setSlides((data as Slide[]) ?? []);

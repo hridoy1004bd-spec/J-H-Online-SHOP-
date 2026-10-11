@@ -7,7 +7,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { money } from "../utils/format";
 
 export default function ProductCard({ product }: { product: Product }) {
-  const { t, pick } = useLanguage();
+  const { t, pick, lang } = useLanguage();
   const navigate = useNavigate();
   const image = mainImage(product);
   const discount = discountPct(product.old_price, product.current_price);
@@ -41,9 +41,15 @@ export default function ProductCard({ product }: { product: Product }) {
           {pick(product, "name")}
         </div>
         <div className="flex items-baseline gap-1.5 mt-auto">
-          <span className="text-[14px] font-extrabold text-teal-dark">{money(product.current_price)}</span>
-          {product.old_price > product.current_price && (
-            <span className="text-[11px] text-mute line-through">{money(product.old_price)}</span>
+          {Number(product.current_price) > 0 ? (
+            <>
+              <span className="text-[14px] font-extrabold text-teal-dark">{money(product.current_price)}</span>
+              {product.old_price > product.current_price && (
+                <span className="text-[11px] text-mute line-through">{money(product.old_price)}</span>
+              )}
+            </>
+          ) : (
+            <span className="text-[12px] font-bold text-mute">{lang === "bn" ? "দাম শীঘ্রই জানানো হবে" : "Price coming soon"}</span>
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
+import { applyTheme } from "./utils/theme";
 import CustomerLayout from "./layouts/CustomerLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
@@ -35,8 +36,18 @@ import AdminReviews from "./pages/admin/AdminReviews";
 import AdminMenu from "./pages/admin/AdminMenu";
 import AdminFaq from "./pages/admin/AdminFaq";
 
+function ThemeSync() {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    applyTheme(pathname);
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
+    <>
+    <ThemeSync />
     <Routes>
       <Route element={<CustomerLayout />}>
         <Route path="/" element={<Home />} />
@@ -74,5 +85,6 @@ export default function App() {
         <Route path="faq" element={<AdminFaq />} />
       </Route>
     </Routes>
+    </>
   );
 }

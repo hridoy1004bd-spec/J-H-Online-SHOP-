@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  LayoutGrid,
   Plus,
   Package,
   ClipboardList,
@@ -15,6 +14,8 @@ import {
   Image,
   Megaphone,
   Gift,
+  Star,
+  ListOrdered,
   Menu,
   X,
   LogOut
@@ -34,7 +35,6 @@ export default function AdminLayout() {
   const links = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), end: true },
     { to: "/admin/products/new", icon: Plus, label: t("newProduct") },
-    { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি ম্যানেজ" },
     { to: "/admin/products", icon: Package, label: t("allProductsAdmin") },
     { to: "/admin/orders", icon: ClipboardList, label: t("orderMgmt") },
     { to: "/admin/customers", icon: Users2, label: t("customers") },
@@ -46,7 +46,9 @@ export default function AdminLayout() {
     { to: "/admin/support", icon: MessageCircle, label: t("support") },
     { to: "/admin/banners", icon: Image, label: lang === "en" ? "Banners" : "ব্যানার" },
     { to: "/admin/notices", icon: Megaphone, label: lang === "en" ? "Notices" : "নোটিশ" },
-    { to: "/admin/featured-banners", icon: Image, label: lang === "en" ? "Featured Banner" : "ফিচার্ড ব্যানার" }
+    { to: "/admin/featured-banners", icon: Image, label: lang === "en" ? "Featured Banner" : "ফিচার্ড ব্যানার" },
+    { to: "/admin/reviews", icon: Star, label: lang === "en" ? "Reviews" : "কাস্টমার রিভিউ" },
+    { to: "/admin/menu", icon: ListOrdered, label: lang === "en" ? "Site Menu" : "মেনু ম্যানেজ" }
   ];
 
   return (

@@ -3,6 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Search, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, Globe } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { supabase } from "../lib/supabase";
+import MenuIcon from "./MenuIcon";
+
+interface MenuItemRow {
+  id: string;
+  label_bn: string;
+  label_en: string | null;
+  icon: string;
+  link: string;
+}
 
 export default function Header() {
   const { t, lang, setLang } = useLanguage();
@@ -11,9 +20,9 @@ export default function Header() {
   const [storeName, setStoreName] = useState("J H Online SHOP");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItemRow[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,31 +38,29 @@ export default function Header() {
         if (data.logo_url) setLogoUrl(data.logo_url);
       });
 
-    function loadWallet(userId: string | null) {
-      if (!userId) {
-        if (active) {
-          setLoggedIn(false);
-          setWalletBalance(null);
-        }
-        return;
-      }
-      if (active) setLoggedIn(true);
+    supabase
+      .from("menu_items")
+      .select("id, label_bn, label_en, icon, link")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data }) => {
+        if (active && data) setMenuItems(data as MenuItemRow[]);
+      });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
       supabase
         .from("wallets")
         .select("balance")
-        .eq("user_id", userId)
+        .eq("user_id", session.user.id)
         .maybeSingle()
         .then(({ data }) => {
-          if (active) setWalletBalance(data ? Number(data.balance) : 0);
+          if (active && data) setWalletBalance(Number(data.balance));
         });
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => loadWallet(session?.user.id ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => loadWallet(session?.user.id ?? null));
+    });
 
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
     };
   }, []);
 
@@ -71,6 +78,12 @@ export default function Header() {
       navigate(`/search?q=${encodeURIComponent(query.trim())}`);
       setMenuOpen(false);
     }
+  }
+
+  function openItem(link: string) {
+    setMenuOpen(false);
+    if (/^https?:\/\//i.test(link)) window.open(link, "_blank", "noopener");
+    else navigate(link.startsWith("/") ? link : `/${link}`);
   }
 
   return (
@@ -102,7 +115,7 @@ export default function Header() {
             {lang === "bn" ? "EN" : "বাংলা"}
           </button>
 
-          {loggedIn && (
+          {walletBalance !== null && (
             <button
               onClick={() => setShowBalance((v) => !v)}
               className="press flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 bg-gradient-to-r from-orange to-[#FFA24C] shadow-md ring-1 ring-white/30"
@@ -112,7 +125,7 @@ export default function Header() {
                 <Wallet size={13} className="text-orange" />
               </span>
               <span className="text-[12px] font-extrabold text-white leading-none">
-                {showBalance ? `৳${walletBalance ?? 0}` : "৳ ●●●"}
+                {showBalance ? `৳${walletBalance}` : "৳ ●●●"}
               </span>
               {showBalance ? <EyeOff size={12} className="text-white/90" /> : <Eye size={12} className="text-white/90" />}
             </button>
@@ -135,7 +148,22 @@ export default function Header() {
               className="bg-transparent outline-none text-sm flex-1 min-w-0 ml-2"
             />
           </form>
-          {/* নতুন ফিচার পরে এই মেনুতে যোগ হবে */}
+          {menuItems.length > 0 && (
+            <div className="divide-y divide-border">
+              {menuItems.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => openItem(m.link)}
+                  className="press w-full flex items-center gap-3 py-3 text-left"
+                >
+                  <span className="w-9 h-9 rounded-full bg-teal-tint text-teal-dark flex items-center justify-center shrink-0">
+                    <MenuIcon name={m.icon} size={17} />
+                  </span>
+                  <span className="text-sm font-bold">{lang === "en" && m.label_en ? m.label_en : m.label_bn}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </header>

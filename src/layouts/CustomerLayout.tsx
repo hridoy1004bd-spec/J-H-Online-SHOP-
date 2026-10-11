@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import Header from "../components/Header";
 import BottomNav from "../components/BottomNav";
 import Footer from "../components/Footer";
+import FloatingContact from "../components/FloatingContact";
 
 export default function CustomerLayout() {
   return (
@@ -13,6 +14,7 @@ export default function CustomerLayout() {
         <Footer />
       </main>
       <BottomNav />
+      <FloatingContact />
     </div>
   );
 }

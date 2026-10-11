@@ -222,10 +222,25 @@ export default function EditProduct() {
     }
   }
 
+  async function pickColorImage(color: string, url: string) {
+    if (!id) return;
+    const { error } = await supabase.from("product_variants").update({ image_url: url }).eq("product_id", id).eq("color", color);
+    if (error) return showToast(error.message, "error");
+    setVariants((vs) => vs.map((r) => (r.color === color ? { ...r, imageUrl: url } : r)));
+    showToast(lang === "en" ? `${color}: image set ✓` : `${color}: ছবি বসেছে ✓`, "success");
+  }
+
+  async function clearColorImage(color: string) {
+    if (!id) return;
+    const { error } = await supabase.from("product_variants").update({ image_url: null }).eq("product_id", id).eq("color", color);
+    if (error) return showToast(error.message, "error");
+    setVariants((vs) => vs.map((r) => (r.color === color ? { ...r, imageUrl: "" } : r)));
+  }
+
   async function deleteVariantRow(idx: number) {
     const row = variants[idx];
     if (row.id) {
-      if (!confirm(lang === "en" ? "Delete this variant?" : "এই ভ্যারিয়েন্টটি মুছে ফেলতে চন?")) return;
+      if (!confirm(lang === "en" ? "Delete this variant?" : "এই ভ্যারিয়েন্টটি মুছে ফেলতে চান?")) return;
       await supabase.from("inventory").delete().eq("product_id", id);
       await supabase.from("product_variants").delete().eq("id", row.id);
     }
@@ -233,6 +248,9 @@ export default function EditProduct() {
   }
 
   if (loading || !product) return <div className="text-sm text-mute">{t("loading")}</div>;
+
+  const colorList: string[] = Array.from(new Set<string>(variants.map((v) => v.color.trim()).filter(Boolean)));
+  const photos = product.product_images ?? [];
 
   const topCats = categories.filter((c) => !(c as any).parent_id);
   const childCats = (parentId: string) => categories.filter((c) => (c as any).parent_id === parentId);
@@ -319,6 +337,47 @@ export default function EditProduct() {
       <button onClick={save} disabled={saving} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60 mb-8">
         {saving ? t("loading") : t("save")}
       </button>
+
+      {colorList.length > 0 && photos.length > 0 && (
+        <div className="border-t border-border pt-5 mb-6">
+          <div className="text-sm font-extrabold mb-1">{lang === "en" ? "Color photos" : "কালারের ছবি"}</div>
+          <div className="text-xs text-mute mb-3">
+            {lang === "en"
+              ? "Tap the photo that matches each color. Customers will see this photo for that color."
+              : "প্রতিটি কালারের নিচে থেকে ওই রঙের ছবিটায় চাপ দিন। কাস্টমার ওই কালার চাপলে এই ছবি দেখবে, কার্টেও এই ছবি যাবে। সাথে সাথে সেভ হয়ে যায়।"}
+          </div>
+          <div className="space-y-3">
+            {colorList.map((c) => {
+              const cur = variants.find((v) => v.color.trim() === c)?.imageUrl ?? "";
+              return (
+                <div key={c} className="bg-white border border-border rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold">{c}</span>
+                    {cur ? (
+                      <button onClick={() => clearColorImage(c)} className="press text-[11px] text-red-500 font-semibold">
+                        {lang === "en" ? "Remove" : "সরান"}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-orange font-semibold">{lang === "en" ? "No photo" : "ছবি বসেনি"}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {photos.map((img) => (
+                      <button
+                        key={img.id}
+                        onClick={() => pickColorImage(c, img.url)}
+                        className={`press w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 ${cur === img.url ? "border-orange" : "border-border"}`}
+                      >
+                        <img src={img.thumbnail_url ?? img.url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-border pt-5">
         <div className="text-sm font-extrabold mb-1">

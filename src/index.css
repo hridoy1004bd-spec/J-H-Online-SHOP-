@@ -48,3 +48,24 @@ html[lang="bn"] body {
     @apply w-full bg-[#F6F8F7] border border-border rounded-xl px-3.5 py-3 text-sm text-ink outline-none focus:border-teal;
   }
 }
+
+/* ===== ডার্ক মোড (শুধু কাস্টমার সাইট) ===== */
+html.dark { color-scheme: dark; }
+html.dark body { background: #0F1519; color: #E6ECEF; }
+html.dark .bg-white { background-color: #182026; }
+html.dark .bg-\[\#FBFCFC\] { background-color: #0F1519; }
+html.dark .bg-\[\#F6F8F7\] { background-color: #1E2830; }
+html.dark .bg-gray-50, html.dark .bg-gray-100 { background-color: #1E2830; }
+html.dark .bg-gray-200, html.dark .bg-gray-300 { background-color: #3A4650; }
+html.dark .bg-teal-tint { background-color: #15302D; }
+html.dark .bg-orange-tint { background-color: #3A2813; }
+html.dark .text-ink { color: #E6ECEF; }
+html.dark .text-mute { color: #98A4B1; }
+html.dark .text-gray-500, html.dark .text-gray-600, html.dark .text-gray-700 { color: #98A4B1; }
+html.dark .text-teal-dark { color: #5FD3C6; }
+html.dark .border-border, html.dark .border-gray-100, html.dark .border-gray-200 { border-color: #2A353E; }
+html.dark .divide-border > :not([hidden]) ~ :not([hidden]) { border-color: #2A353E; }
+html.dark .input { background-color: #1E2830; color: #E6ECEF; border-color: #2A353E; }
+html.dark input, html.dark textarea, html.dark select { color: #E6ECEF; }
+html.dark input::placeholder, html.dark textarea::placeholder { color: #7B8794; }
+html.dark header .bg-white.rounded-full { background-color: #fff; }

@@ -11,6 +11,7 @@ import Cart from "./pages/customer/Cart";
 import Checkout from "./pages/customer/Checkout";
 import Orders from "./pages/customer/Orders";
 import Account from "./pages/customer/Account";
+import Reviews from "./pages/customer/Reviews";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -29,7 +30,8 @@ import Support from "./pages/admin/Support";
 import Banners from "./pages/admin/Banners";
 import Notices from "./pages/admin/Notices";
 import FeaturedBanners from "./pages/admin/FeaturedBanners";
-import AdminCategories from "./pages/admin/AdminCategories";
+import AdminReviews from "./pages/admin/AdminReviews";
+import AdminMenu from "./pages/admin/AdminMenu";
 
 export default function App() {
   return (
@@ -43,6 +45,7 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/reviews" element={<Reviews />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -63,7 +66,8 @@ export default function App() {
         <Route path="banners" element={<Banners />} />
         <Route path="notices" element={<Notices />} />
         <Route path="featured-banners" element={<FeaturedBanners />} />
-        <Route path="categories" element={<AdminCategories />} />
+        <Route path="reviews" element={<AdminReviews />} />
+        <Route path="menu" element={<AdminMenu />} />
       </Route>
     </Routes>
   );

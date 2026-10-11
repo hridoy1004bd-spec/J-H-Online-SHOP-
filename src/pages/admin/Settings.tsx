@@ -12,6 +12,9 @@ type StoreSettings = BaseSettings & {
   facebook_url?: string | null;
   youtube_url?: string | null;
   instagram_url?: string | null;
+  messenger_url?: string | null;
+  telegram_url?: string | null;
+  float_buttons_enabled?: boolean | null;
   footer_about_bn?: string | null;
   footer_about_en?: string | null;
   footer_links?: { label: string; url: string }[] | null;
@@ -50,6 +53,9 @@ export default function Settings() {
         facebook_url: settings.facebook_url?.trim() || null,
         youtube_url: settings.youtube_url?.trim() || null,
         instagram_url: settings.instagram_url?.trim() || null,
+        messenger_url: settings.messenger_url?.trim() || null,
+        telegram_url: settings.telegram_url?.trim() || null,
+        float_buttons_enabled: settings.float_buttons_enabled !== false,
         footer_about_bn: settings.footer_about_bn?.trim() || null,
         footer_about_en: settings.footer_about_en?.trim() || null,
         footer_links: (settings.footer_links ?? []).filter((l) => l.label.trim() && l.url.trim()),
@@ -91,6 +97,25 @@ export default function Settings() {
       <Field label={t("whatsapp")}>
         <input value={settings.whatsapp ?? ""} onChange={(e) => setSettings({ ...settings, whatsapp: e.target.value })} className="input" />
       </Field>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">ভাসমান যোগাযোগ বাটন</div>
+      <div className="text-[11px] text-mute mb-2">
+        সাইটের ডান নিচে বাটন দেখাবে। WhatsApp ও কল নম্বর ওপরের ঘর থেকে আসে। যেটার লিংক ফাঁকা সেটা দেখাবে না।
+      </div>
+      <Field label="Messenger লিংক">
+        <input value={settings.messenger_url ?? ""} onChange={(e) => setSettings({ ...settings, messenger_url: e.target.value })} placeholder="https://m.me/yourpage" className="input" />
+      </Field>
+      <Field label="Telegram লিংক">
+        <input value={settings.telegram_url ?? ""} onChange={(e) => setSettings({ ...settings, telegram_url: e.target.value })} placeholder="https://t.me/username" className="input" />
+      </Field>
+      <label className="flex items-center gap-2 mb-4">
+        <input
+          type="checkbox"
+          checked={settings.float_buttons_enabled !== false}
+          onChange={(e) => setSettings({ ...settings, float_buttons_enabled: e.target.checked })}
+        />
+        <span className="text-sm font-semibold">ভাসমান বাটন দেখাও</span>
+      </label>
 
       <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">ফুটার / Footer</div>
       <Field label="Email">

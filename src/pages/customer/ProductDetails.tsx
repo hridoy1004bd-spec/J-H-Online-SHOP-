@@ -144,12 +144,18 @@ export default function ProductDetails() {
         {product.product_code && <div className="text-xs text-mute mt-1">{t("productCode")}: {product.product_code}</div>}
 
         <div className="flex items-baseline gap-2 mt-2">
-          <span className="text-xl font-extrabold text-teal-dark">{money(product.current_price)}</span>
-          {product.old_price > product.current_price && (
+          {Number(product.current_price) > 0 ? (
             <>
-              <span className="text-sm text-mute line-through">{money(product.old_price)}</span>
-              <span className="text-xs font-bold text-orange">{discount}% {t("off")}</span>
+              <span className="text-xl font-extrabold text-teal-dark">{money(product.current_price)}</span>
+              {product.old_price > product.current_price && (
+                <>
+                  <span className="text-sm text-mute line-through">{money(product.old_price)}</span>
+                  <span className="text-xs font-bold text-orange">{discount}% {t("off")}</span>
+                </>
+              )}
             </>
+          ) : (
+            <span className="text-base font-bold text-mute">{lang === "bn" ? "দাম শীঘ্রই জানানো হবে" : "Price coming soon"}</span>
           )}
         </div>
 

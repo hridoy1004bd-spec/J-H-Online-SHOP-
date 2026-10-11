@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, Globe } from "lucide-react";
+import { Search, ShoppingBag, Wallet, Menu, X, Eye, EyeOff, Globe, Moon, Sun } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { supabase } from "../lib/supabase";
 import MenuIcon from "./MenuIcon";
+import { getTheme, setTheme, type ThemeMode } from "../utils/theme";
 
 interface MenuItemRow {
   id: string;
@@ -23,6 +24,7 @@ export default function Header() {
   const [showBalance, setShowBalance] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItemRow[]>([]);
+  const [theme, setThemeState] = useState<ThemeMode>(getTheme());
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,6 +80,12 @@ export default function Header() {
       navigate(`/search?q=${encodeURIComponent(query.trim())}`);
       setMenuOpen(false);
     }
+  }
+
+  function toggleTheme() {
+    const next: ThemeMode = theme === "dark" ? "light" : "dark";
+    setThemeState(next);
+    setTheme(next);
   }
 
   function openItem(link: string) {
@@ -164,6 +172,18 @@ export default function Header() {
               ))}
             </div>
           )}
+          <button
+            onClick={toggleTheme}
+            className="press w-full flex items-center gap-3 py-3 text-left border-t border-border"
+          >
+            <span className="w-9 h-9 rounded-full bg-teal-tint text-teal-dark flex items-center justify-center shrink-0">
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            </span>
+            <span className="text-sm font-bold flex-1">{lang === "en" ? "Dark mode" : "ডার্ক মোড"}</span>
+            <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${theme === "dark" ? "bg-teal" : "bg-gray-300"}`}>
+              <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${theme === "dark" ? "translate-x-5" : ""}`} />
+            </span>
+          </button>
         </div>
       )}
     </header>

@@ -12,6 +12,7 @@ import Checkout from "./pages/customer/Checkout";
 import Orders from "./pages/customer/Orders";
 import Account from "./pages/customer/Account";
 import Reviews from "./pages/customer/Reviews";
+import FaqPage from "./pages/customer/Faq";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -32,6 +33,7 @@ import Notices from "./pages/admin/Notices";
 import FeaturedBanners from "./pages/admin/FeaturedBanners";
 import AdminReviews from "./pages/admin/AdminReviews";
 import AdminMenu from "./pages/admin/AdminMenu";
+import AdminFaq from "./pages/admin/AdminFaq";
 
 export default function App() {
   return (
@@ -46,6 +48,7 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/account" element={<Account />} />
         <Route path="/reviews" element={<Reviews />} />
+        <Route path="/faq" element={<FaqPage />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -68,6 +71,7 @@ export default function App() {
         <Route path="featured-banners" element={<FeaturedBanners />} />
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="menu" element={<AdminMenu />} />
+        <Route path="faq" element={<AdminFaq />} />
       </Route>
     </Routes>
   );

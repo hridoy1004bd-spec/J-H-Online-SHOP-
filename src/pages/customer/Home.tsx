@@ -52,10 +52,12 @@ export default function Home() {
       ]);
       setCategories(cats as Category[]);
       loadCategoryImages(cats as Category[]).then(setCatImages).catch(() => {});
-      setAllProducts(general.products);
-      setNewArrivals(arrivals.products);
-      setBestSellers(best.products);
-      setFeatured(feat.products);
+      // দাম বসেনি এমন (শীঘ্রই আসছে) পণ্য হোমের সেকশনে দেখাব না
+      const priced = (list: Product[]) => list.filter((p) => Number(p.current_price) > 0);
+      setAllProducts(priced(general.products));
+      setNewArrivals(priced(arrivals.products));
+      setBestSellers(priced(best.products));
+      setFeatured(priced(feat.products));
     } catch {
       setError(true);
     } finally {

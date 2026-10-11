@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Wallet, Phone, Calendar, KeyRound, Package } from "lucide-react";
+import { ArrowLeft, Wallet, Phone, Calendar, KeyRound, Package, Plus, Minus, AlertTriangle } from "lucide-react";
 import { supabase, FUNCTIONS_URL } from "../../lib/supabase";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -37,6 +37,24 @@ interface OrderRow {
   order_items: OrderItemRow[];
 }
 
+interface DueRow {
+  id: string;
+  amount: number;
+  paid: number;
+  note: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface TxRow {
+  id: string;
+  type: string;
+  amount: number;
+  balance_after: number;
+  description: string | null;
+  created_at: string;
+}
+
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -47,6 +65,16 @@ export default function CustomerDetail() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+
+  const [dues, setDues] = useState<DueRow[]>([]);
+  const [txs, setTxs] = useState<TxRow[]>([]);
+  const [walletModal, setWalletModal] = useState<"add" | "sub" | null>(null);
+  const [dueModal, setDueModal] = useState(false);
+  const [amountInput, setAmountInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [sendNotice, setSendNotice] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [showResetModal, setShowResetModal] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -72,12 +100,100 @@ export default function CustomerDetail() {
           .eq("user_id", cust.auth_user_id)
           .maybeSingle();
         setWalletBalance(Number(wallet?.balance ?? 0));
+
+        const { data: txData } = await supabase
+          .from("wallet_transactions")
+          .select("id, type, amount, balance_after, description, created_at")
+          .eq("user_id", cust.auth_user_id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        setTxs((txData as TxRow[]) ?? []);
       }
+
+      const { data: dueData } = await supabase
+        .from("customer_dues")
+        .select("id, amount, paid, note, status, created_at")
+        .eq("customer_id", id)
+        .order("created_at", { ascending: false });
+      setDues((dueData as DueRow[]) ?? []);
 
       setLoading(false);
     }
     load();
-  }, [id]);
+  }, [id, reloadKey]);
+
+  function closeModals() {
+    setWalletModal(null);
+    setDueModal(false);
+    setAmountInput("");
+    setNoteInput("");
+  }
+
+  async function handleWalletAdjust() {
+    if (!customer || !walletModal) return;
+    const amt = Number(amountInput);
+    if (!amt || amt <= 0) return showToast(lang === "en" ? "Enter a valid amount" : "সঠিক টাকার অংক দিন", "error");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("admin_adjust_wallet", {
+      p_customer_id: customer.id,
+      p_amount: walletModal === "add" ? amt : -amt,
+      p_note: noteInput.trim() || null
+    });
+    setBusy(false);
+    if (error || !data?.success) {
+      const msg = data?.error === "Balance is not enough to deduct"
+        ? "ওয়ালেটে এত টাকা নেই"
+        : data?.error === "Customer has no login account yet"
+        ? "এই কাস্টমারের এখনো লগইন অ্যাকাউন্ট নেই"
+        : data?.error || error?.message || "ব্যর্থ হয়েছে";
+      return showToast(msg, "error");
+    }
+    const ded = Number(data.due_deducted ?? 0);
+    showToast(ded > 0 ? `সম্পন্ন ✓ (বকেয়া বাবদ ৳${ded} কাটা হয়েছে)` : "সম্পন্ন ✓", "success");
+    closeModals();
+    setReloadKey((k) => k + 1);
+  }
+
+  async function handleAddDue() {
+    if (!customer) return;
+    const amt = Number(amountInput);
+    if (!amt || amt <= 0) return showToast(lang === "en" ? "Enter a valid amount" : "সঠিক টাকার অংক দিন", "error");
+    setBusy(true);
+    const { error } = await supabase.from("customer_dues").insert({
+      customer_id: customer.id,
+      amount: amt,
+      note: noteInput.trim() || null
+    });
+    if (error) {
+      setBusy(false);
+      return showToast(error.message, "error");
+    }
+    if (sendNotice) {
+      const reason = noteInput.trim() ? ` (${noteInput.trim()})` : "";
+      await supabase.from("notifications").insert({
+        customer_id: customer.id,
+        type: "due_notice",
+        title: "Outstanding due",
+        body: `You have an outstanding due of TK ${amt}${reason}. It will be deducted automatically when you recharge or redeem a gift card.`,
+        title_en: "Outstanding due",
+        body_en: `You have an outstanding due of TK ${amt}${reason}. It will be deducted automatically when you recharge or redeem a gift card.`,
+        title_bn: "আপনার বকেয়া আছে",
+        body_bn: `আপনার ৳${amt} বকেয়া আছে${reason}। ওয়ালেটে টাকা যোগ বা গিফট কার্ড রিডিম করলে এটি নিজে থেকেই কেটে নেওয়া হবে।`
+      });
+    }
+    setBusy(false);
+    showToast("বকেয়া যোগ হয়েছে ✓", "success");
+    closeModals();
+    setReloadKey((k) => k + 1);
+  }
+
+  async function cancelDue(d: DueRow) {
+    if (!confirm("এই বকেয়া বাতিল করবেন?")) return;
+    const { error } = await supabase.from("customer_dues").update({ status: "cancelled", settled_at: new Date().toISOString() }).eq("id", d.id);
+    if (error) return showToast(error.message, "error");
+    showToast("বাতিল হয়েছে ✓", "success");
+    setReloadKey((k) => k + 1);
+  }
 
   async function handleResetPassword() {
     if (!customer) return;
@@ -166,6 +282,99 @@ export default function CustomerDetail() {
         </div>
       </div>
 
+      {customer.auth_user_id ? (
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <button
+            onClick={() => setWalletModal("add")}
+            className="press flex items-center justify-center gap-1.5 bg-teal-tint text-teal-dark rounded-xl py-3 text-sm font-bold"
+          >
+            <Plus size={16} /> {lang === "en" ? "Add Balance" : "টাকা যোগ করুন"}
+          </button>
+          <button
+            onClick={() => setWalletModal("sub")}
+            className="press flex items-center justify-center gap-1.5 bg-red-50 text-red-600 rounded-xl py-3 text-sm font-bold"
+          >
+            <Minus size={16} /> {lang === "en" ? "Deduct Balance" : "টাকা কমান"}
+          </button>
+        </div>
+      ) : (
+        <div className="text-[11px] text-mute bg-white border border-border rounded-xl p-3 mb-3">
+          এই কাস্টমারের এখনো লগইন অ্যাকাউন্ট নেই, তাই ওয়ালেটে টাকা যোগ/কমানো যাবে না। (বকেয়া লেখা যাবে।)
+        </div>
+      )}
+
+      {/* বকেয়া */}
+      {(() => {
+        const open = dues.filter((d) => d.status === "open");
+        const openTotal = open.reduce((s, d) => s + (Number(d.amount) - Number(d.paid)), 0);
+        return (
+          <div className="bg-white border border-border rounded-xl p-3 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-mute">
+                <AlertTriangle size={14} className={openTotal > 0 ? "text-red-500" : "text-mute"} /> বকেয়া
+              </div>
+              <div className={`text-sm font-extrabold ${openTotal > 0 ? "text-red-600" : "text-teal-dark"}`}>
+                {openTotal > 0 ? money(openTotal) : "কোনো বকেয়া নেই"}
+              </div>
+            </div>
+            {dues.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {dues.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-2 text-xs border-t border-border pt-1.5">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink/80 truncate">{d.note || "বকেয়া"}</div>
+                      <div className="text-[10.5px] text-mute">
+                        {formatDate(d.created_at, lang)} · ৳{Number(d.amount)}{Number(d.paid) > 0 ? ` (কাটা হয়েছে ৳${Number(d.paid)})` : ""}
+                      </div>
+                    </div>
+                    {d.status === "open" ? (
+                      <button onClick={() => cancelDue(d)} className="press shrink-0 text-[10.5px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-full">
+                        বাতিল
+                      </button>
+                    ) : (
+                      <span className="shrink-0 text-[10.5px] font-bold text-mute bg-gray-100 px-2 py-1 rounded-full">
+                        {d.status === "settled" ? "পরিশোধ" : "বাতিল"}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setDueModal(true)}
+              className="press w-full bg-orange-tint text-orange text-sm font-bold py-2.5 rounded-xl"
+            >
+              + বকেয়া লিখুন ও নোটিশ দিন
+            </button>
+            <div className="text-[10.5px] text-mute mt-1.5">
+              এই কাস্টমার ওয়ালেটে টাকা যোগ বা গিফট কার্ড রিডিম করলেই বকেয়া নিজে থেকে কেটে নেওয়া হবে।
+            </div>
+          </div>
+        );
+      })()}
+
+      {txs.length > 0 && (
+        <div className="mb-4">
+          <div className="text-xs font-bold text-mute uppercase mb-2">ওয়ালেট লেনদেন (সর্বশেষ ১০টি)</div>
+          <div className="bg-white border border-border rounded-xl divide-y divide-border">
+            {txs.map((x) => {
+              const minus = x.type === "purchase" || x.type === "admin_debit";
+              return (
+                <div key={x.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-ink/80 truncate">{x.description || x.type}</div>
+                    <div className="text-[10.5px] text-mute">{formatDate(x.created_at, lang)}</div>
+                  </div>
+                  <div className={`shrink-0 text-sm font-extrabold ${minus ? "text-red-600" : "text-teal-dark"}`}>
+                    {minus ? "−" : "+"}{money(x.amount)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => setShowResetModal(true)}
         className="press w-full flex items-center justify-center gap-2 bg-white border border-border rounded-xl py-3 mb-5 text-sm font-bold text-ink"
@@ -209,6 +418,51 @@ export default function CustomerDetail() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {(walletModal || dueModal) && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="font-extrabold text-base mb-1">
+              {walletModal === "add" ? "ওয়ালেটে টাকা যোগ করুন" : walletModal === "sub" ? "ওয়ালেট থেকে টাকা কমান" : "বকেয়া লিখুন"}
+            </div>
+            <div className="text-xs text-mute mb-4">
+              {customer.name} — {customer.mobile}
+              {walletModal ? ` · বর্তমান ব্যালেন্স ${money(walletBalance)}` : ""}
+            </div>
+            <input
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value.replace(/[^0-9.]/g, ""))}
+              inputMode="decimal"
+              placeholder="টাকার পরিমাণ"
+              className="input mb-3"
+            />
+            <input
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              placeholder={dueModal ? "কারণ (যেমন: অর্ডার নিয়ে ডেলিভারি চার্জ দেয়নি)" : "নোট (ঐচ্ছিক)"}
+              className="input mb-3"
+            />
+            {dueModal && (
+              <label className="flex items-center gap-2 mb-3 text-xs font-semibold">
+                <input type="checkbox" checked={sendNotice} onChange={(e) => setSendNotice(e.target.checked)} />
+                কাস্টমারকে নোটিশ পাঠান
+              </label>
+            )}
+            <div className="flex gap-2">
+              <button onClick={closeModals} className="press flex-1 bg-gray-100 text-ink text-sm font-bold py-2.5 rounded-xl">
+                {lang === "en" ? "Cancel" : "বাতিল"}
+              </button>
+              <button
+                onClick={dueModal ? handleAddDue : handleWalletAdjust}
+                disabled={busy}
+                className="press flex-1 bg-teal text-white text-sm font-bold py-2.5 rounded-xl disabled:opacity-60"
+              >
+                {busy ? t("loading") : "নিশ্চিত করুন"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

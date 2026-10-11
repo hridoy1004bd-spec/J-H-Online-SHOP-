@@ -4,11 +4,15 @@ import { productService } from "../../services/productService";
 import { loadCategoryImages } from "../../services/categoryImages";
 import ProductCard from "../../components/ProductCard";
 import CategoryShowcase from "../../components/CategoryShowcase";
+import CategoryNote from "../../components/CategoryNote";
+import { supabase } from "../../lib/supabase";
 import { ProductGridSkeleton } from "../../components/LoadingSkeleton";
 import { useLanguage } from "../../i18n/LanguageContext";
 import type { Category, Product } from "../../types";
 
 const PAGE_SIZE = 20;
+
+type CatWithNote = Category & { note_bn?: string | null; note_en?: string | null };
 
 export default function Categories() {
   const { lang, pick } = useLanguage();
@@ -24,6 +28,18 @@ export default function Categories() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [groups, setGroups] = useState<{ cat: Category; products: Product[]; total: number }[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [allNote, setAllNote] = useState<{ bn: string | null; en: string | null }>({ bn: null, en: null });
+
+  useEffect(() => {
+    supabase
+      .from("store_settings")
+      .select("all_note_bn, all_note_en")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (data) setAllNote({ bn: (data as any).all_note_bn ?? null, en: (data as any).all_note_en ?? null });
+      });
+  }, []);
 
   useEffect(() => {
     productService.listCategories().then(async (c) => {
@@ -36,6 +52,13 @@ export default function Categories() {
   const selected = categories.find((c) => c.slug === slug) ?? null;
   const activeTop = selected ? (selected.parent_id ? categories.find((c) => c.id === selected.parent_id) ?? null : selected) : null;
   const activeSub = selected && selected.parent_id ? selected : null;
+  const noteOf = (c: Category | null): string => {
+    const x = c as CatWithNote | null;
+    if (!x) return "";
+    return ((lang === "en" && x.note_en?.trim() ? x.note_en : x.note_bn) ?? "").trim();
+  };
+  const catNote = noteOf(activeSub) || noteOf(activeTop);
+  const allNoteText = ((lang === "en" && allNote.en?.trim() ? allNote.en : allNote.bn) ?? "").trim();
   const kids = activeTop ? categories.filter((c) => c.parent_id === activeTop.id) : [];
 
   const ids: string[] | undefined = activeSub
@@ -126,6 +149,7 @@ export default function Categories() {
   return (
     <div className="pt-3 pb-4">
       {!activeTop && <CategoryShowcase categories={categories} images={images} />}
+      {!activeTop && <CategoryNote text={allNoteText} />}
 
       {!activeTop && (
         <div className="mt-2">
@@ -157,6 +181,7 @@ export default function Categories() {
 
       {activeTop && (
         <>
+      <CategoryNote text={catNote} />
       <div className="px-4 mt-4 mb-2 font-extrabold text-[15px] text-ink">
         {activeSub ? pick(activeSub, "name") : activeTop ? pick(activeTop, "name") : ""}
         <span className="text-xs font-semibold text-mute ml-2">({total})</span>

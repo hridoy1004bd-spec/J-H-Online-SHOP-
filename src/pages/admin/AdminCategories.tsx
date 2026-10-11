@@ -12,10 +12,12 @@ interface Form {
   parent_id: string;
   icon: string;
   image_url: string;
+  note_bn: string;
+  note_en: string;
   is_active: boolean;
 }
 
-const EMPTY: Form = { id: null, name_bn: "", name_en: "", parent_id: "", icon: "", image_url: "", is_active: true };
+const EMPTY: Form = { id: null, name_bn: "", name_en: "", parent_id: "", icon: "", image_url: "", note_bn: "", note_en: "", is_active: true };
 
 function makeSlug(en: string, bn: string): string {
   const base = (en || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -33,6 +35,32 @@ export default function AdminCategories() {
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [allNoteBn, setAllNoteBn] = useState("");
+  const [allNoteEn, setAllNoteEn] = useState("");
+  const [allSaving, setAllSaving] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from("store_settings")
+      .select("all_note_bn, all_note_en")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        setAllNoteBn((data as any)?.all_note_bn ?? "");
+        setAllNoteEn((data as any)?.all_note_en ?? "");
+      });
+  }, []);
+
+  async function saveAllNote() {
+    setAllSaving(true);
+    const { error } = await supabase
+      .from("store_settings")
+      .update({ all_note_bn: allNoteBn.trim() || null, all_note_en: allNoteEn.trim() || null })
+      .eq("id", 1);
+    setAllSaving(false);
+    if (error) return showToast(error.message, "error");
+    showToast(L("সেভ হয়েছে", "Saved"), "success");
+  }
 
   async function load() {
     const { data } = await supabase.from("categories").select("*").order("sort_order", { ascending: true });
@@ -82,6 +110,8 @@ export default function AdminCategories() {
         parent_id: form.parent_id || null,
         icon: form.icon.trim() || null,
         image_url: form.image_url.trim() || null,
+        note_bn: form.note_bn.trim() || null,
+        note_en: form.note_en.trim() || null,
         is_active: form.is_active
       };
       if (form.id) {
@@ -142,6 +172,8 @@ export default function AdminCategories() {
       parent_id: c.parent_id ?? "",
       icon: c.icon ?? "",
       image_url: c.image_url ?? "",
+      note_bn: (c as any).note_bn ?? "",
+      note_en: (c as any).note_en ?? "",
       is_active: c.is_active
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -207,6 +239,9 @@ export default function AdminCategories() {
             )}
           </div>
           <div className="text-[11px] text-mute">{L("ছবি না দিলে ওই ক্যাটাগরির পণ্যের ছবি নিজে থেকে বসবে।", "Without an image, a product photo from it is used.")}</div>
+          <div className="text-xs font-bold text-mute">{L("নোট (ডেলিভারি কোথায় কোথায় দেবেন ইত্যাদি)", "Note (e.g. delivery areas)")}</div>
+          <textarea className="input resize-none" rows={3} placeholder={L("যেমন: শুধু চৌদ্দগ্রাম ও কুমিল্লা শহরে ডেলিভারি। ফাঁকা রাখলে নোট দেখাবে না।", "Bangla note")} value={form.note_bn} onChange={(e) => setForm({ ...form, note_bn: e.target.value })} />
+          <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={form.note_en} onChange={(e) => setForm({ ...form, note_en: e.target.value })} />
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
             {L("চালু (সাইটে দেখাবে)", "Active (show on site)")}
@@ -216,6 +251,16 @@ export default function AdminCategories() {
           </button>
         </div>
       )}
+
+      <div className="bg-white border border-border rounded-2xl p-3 mb-4 space-y-2">
+        <div className="font-extrabold text-sm">{L("সব পণ্যের উপরের নোট", "Note above All products")}</div>
+        <div className="text-[11px] text-mute">{L("ক্যাটাগরি না বেছে সব পণ্যের পেইজে এই নোট ওপরে দেখাবে। ফাঁকা রাখলে দেখাবে না।", "Shown above the all-products page. Leave empty to hide.")}</div>
+        <textarea className="input resize-none" rows={2} placeholder={L("বাংলা নোট", "Bangla note")} value={allNoteBn} onChange={(e) => setAllNoteBn(e.target.value)} />
+        <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={allNoteEn} onChange={(e) => setAllNoteEn(e.target.value)} />
+        <button onClick={saveAllNote} disabled={allSaving} className="press w-full bg-teal text-white font-bold text-sm py-2.5 rounded-xl disabled:opacity-60">
+          {allSaving ? L("সেভ হচ্ছে...", "Saving...") : L("নোট সেভ করুন", "Save note")}
+        </button>
+      </div>
 
       {loading ? (
         <div className="text-sm text-mute">{L("লোড হচ্ছে...", "Loading...")}</div>

@@ -181,10 +181,12 @@ export default function Categories() {
 
       {activeTop && (
         <>
-      <CategoryNote text={catNote} />
       <div className="px-4 mt-4 mb-2 font-extrabold text-[15px] text-ink">
         {activeSub ? pick(activeSub, "name") : activeTop ? pick(activeTop, "name") : ""}
         <span className="text-xs font-semibold text-mute ml-2">({total})</span>
+      </div>
+      <div className="mb-3">
+        <CategoryNote text={catNote} />
       </div>
 
       {kids.length > 0 && (

@@ -50,11 +50,16 @@ export const otpService = {
 
       // Exchange the token hash for a real client-side Supabase session.
       if (data.tokenHash) {
-        const { error } = await supabase.auth.verifyOtp({
+        let { error } = await supabase.auth.verifyOtp({
           token_hash: data.tokenHash,
           type: "email"
         });
-        if (error) return { success: false, error: "Could not establish session" };
+        if (error) {
+          // পুরনো টোকেন টাইপের জন্য আরেকবার চেষ্টা
+          const retry = await supabase.auth.verifyOtp({ token_hash: data.tokenHash, type: "magiclink" });
+          error = retry.error;
+        }
+        if (error) return { success: false, error: "Could not establish session: " + error.message };
       }
 
       return { success: true, customer: data.customer };

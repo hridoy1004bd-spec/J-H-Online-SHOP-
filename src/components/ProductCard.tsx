@@ -5,6 +5,7 @@ import type { Product } from "../types";
 import { discountPct, mainImage, stockForVariant } from "../services/productService";
 import { useLanguage } from "../i18n/LanguageContext";
 import { money } from "../utils/format";
+import FavoriteButton from "./FavoriteButton";
 
 export default function ProductCard({ product }: { product: Product }) {
   const { t, pick, lang } = useLanguage();
@@ -25,6 +26,7 @@ export default function ProductCard({ product }: { product: Product }) {
         ) : (
           <ShoppingBag className="text-teal/40" size={40} />
         )}
+        <FavoriteButton productId={product.id} className="absolute top-2 right-2 z-10" />
         {discount > 0 && (
           <span className="absolute top-2 left-2 bg-orange text-white text-[10px] font-bold px-2 py-1 rounded-full">
             {discount}% {t("off")}

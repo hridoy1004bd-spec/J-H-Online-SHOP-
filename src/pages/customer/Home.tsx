@@ -45,7 +45,7 @@ export default function Home() {
     try {
       const [cats, general, arrivals, best, feat] = await Promise.all([
         productService.listCategories(),
-        productService.list({ pageSize: 12 }),
+        productService.list({ pageSize: 40 }),
         productService.list({ newArrivals: true, pageSize: 8 }),
         productService.list({ bestSeller: true, pageSize: 8 }),
         productService.list({ featured: true, pageSize: 8 })
@@ -53,8 +53,10 @@ export default function Home() {
       setCategories(cats as Category[]);
       loadCategoryImages(cats as Category[]).then(setCatImages).catch(() => {});
       // দাম বসেনি এমন (শীঘ্রই আসছে) পণ্য হোমের সেকশনে দেখাব না
-      const priced = (list: Product[]) => list.filter((p) => Number(p.current_price) > 0);
-      setAllProducts(priced(general.products));
+      // অ্যাডমিন যেগুলো হোমে লুকাতে বলেছে (hide_on_home) সেগুলোও দেখাব না
+      const priced = (list: Product[]) =>
+        list.filter((p) => Number(p.current_price) > 0 && !(p as unknown as { hide_on_home?: boolean }).hide_on_home);
+      setAllProducts(priced(general.products).slice(0, 12));
       setNewArrivals(priced(arrivals.products));
       setBestSellers(priced(best.products));
       setFeatured(priced(feat.products));

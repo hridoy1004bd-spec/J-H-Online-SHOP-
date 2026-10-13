@@ -55,6 +55,13 @@ export const productService = {
     return data as unknown as Product;
   },
 
+  async getByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase.from("products").select(PRODUCT_SELECT).in("id", ids).eq("is_active", true);
+    if (error) throw error;
+    return (data ?? []) as unknown as Product[];
+  },
+
   async getRelated(categoryId: string | null, excludeId: string, limit = 6) {
     if (!categoryId) return [];
     const { data, error } = await supabase

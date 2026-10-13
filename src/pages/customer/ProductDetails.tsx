@@ -6,6 +6,8 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { useCart } from "../../contexts/CartContext";
 import { useToast } from "../../contexts/ToastContext";
 import { money } from "../../utils/format";
+import { supabase } from "../../lib/supabase";
+import FavoriteButton from "../../components/FavoriteButton";
 import { LineSkeleton } from "../../components/LoadingSkeleton";
 import ProductCard from "../../components/ProductCard";
 import type { Product } from "../../types";
@@ -25,6 +27,32 @@ export default function ProductDetails() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [dl, setDl] = useState<{
+    inside: number; outside: number; mode: string; freeMin: number;
+    daysIn: string; daysOut: string; noteBn: string; noteEn: string;
+  } | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("store_settings")
+      .select("delivery_charge_inside_dhaka, delivery_charge_outside_dhaka, delivery_mode, free_delivery_min, delivery_days_inside, delivery_days_outside, delivery_note_bn, delivery_note_en")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        const d = data as any;
+        setDl({
+          inside: Number(d.delivery_charge_inside_dhaka ?? 0),
+          outside: Number(d.delivery_charge_outside_dhaka ?? 0),
+          mode: d.delivery_mode ?? "advance",
+          freeMin: Number(d.free_delivery_min ?? 0),
+          daysIn: d.delivery_days_inside ?? "",
+          daysOut: d.delivery_days_outside ?? "",
+          noteBn: d.delivery_note_bn ?? "",
+          noteEn: d.delivery_note_en ?? ""
+        });
+      });
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -112,6 +140,7 @@ export default function ProductDetails() {
         <button onClick={() => navigate(-1)} className="press absolute top-3 left-3 z-10 bg-white/90 rounded-full p-2">
           <ArrowLeft size={18} />
         </button>
+        <FavoriteButton productId={product.id} size={18} className="absolute top-3 right-3 z-10 !w-9 !h-9" />
         <div className="aspect-square flex items-center justify-center overflow-hidden">
           {previewUrl || images.length > 0 ? (
             <img src={previewUrl ?? images[activeImg]?.url} alt={pick(product, "name")} className="w-full h-full object-cover" />
@@ -254,7 +283,30 @@ export default function ProductDetails() {
             <Truck size={16} className="text-teal shrink-0 mt-0.5" />
             <div className="text-xs text-ink/80">
               <div className="font-bold mb-0.5">{t("deliveryInfo")}</div>
-              {lang === "bn" ? "ঢাকার ভিতরে: ৳৬০ (২-৩ দিন) · ঢাকার বাইরে: ৳১২০ (৩-৫ দিন)" : "Inside Dhaka: ৳60 (2-3 days) · Outside Dhaka: ৳120 (3-5 days)"}
+              {dl && (
+                <>
+                  {dl.mode === "free" ? (
+                    <div>
+                      {lang === "bn" ? "ডেলিভারি ফ্রি" : "Free delivery"}
+                      {dl.daysIn || dl.daysOut ? ` (${[dl.daysIn, dl.daysOut].filter(Boolean).join(" / ")})` : ""}
+                    </div>
+                  ) : (
+                    <div>
+                      {lang === "bn" ? "ঢাকার ভিতরে" : "Inside Dhaka"}: {money(dl.inside)}
+                      {dl.daysIn ? ` (${dl.daysIn})` : ""} · {lang === "bn" ? "ঢাকার বাইরে" : "Outside Dhaka"}: {money(dl.outside)}
+                      {dl.daysOut ? ` (${dl.daysOut})` : ""}
+                    </div>
+                  )}
+                  {dl.mode !== "free" && dl.freeMin > 0 && (
+                    <div className="mt-0.5 font-semibold text-teal-dark">
+                      {lang === "bn" ? `${money(dl.freeMin)} এর বেশি অর্ডারে ডেলিভারি ফ্রি` : `Free delivery on orders above ${money(dl.freeMin)}`}
+                    </div>
+                  )}
+                  {(lang === "bn" ? dl.noteBn : dl.noteEn || dl.noteBn) && (
+                    <div className="mt-1 whitespace-pre-line">{lang === "bn" ? dl.noteBn : dl.noteEn || dl.noteBn}</div>
+                  )}
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-start gap-2 bg-orange-tint rounded-xl p-3">

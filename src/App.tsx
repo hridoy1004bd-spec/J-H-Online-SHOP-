@@ -15,6 +15,7 @@ import Account from "./pages/customer/Account";
 import Reviews from "./pages/customer/Reviews";
 import FaqPage from "./pages/customer/Faq";
 import Favorites from "./pages/customer/Favorites";
+import TrackOrder from "./pages/customer/TrackOrder";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/faq" element={<FaqPage />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route path="/track" element={<TrackOrder />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -84,7 +86,7 @@ export default function App() {
         <Route path="featured-banners" element={<FeaturedBanners />} />
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="menu" element={<AdminMenu />} />
-        <Route path="faq" element={<AdminFaq />} />
+        <Route path="faq" element={<FaqAdminPlaceholder />} />
       </Route>
     </Routes>
     </>

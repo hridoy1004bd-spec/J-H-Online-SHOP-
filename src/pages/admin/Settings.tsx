@@ -18,6 +18,10 @@ type StoreSettings = BaseSettings & {
   footer_about_bn?: string | null;
   footer_about_en?: string | null;
   footer_links?: { label: string; url: string }[] | null;
+  delivery_days_inside?: string | null;
+  delivery_days_outside?: string | null;
+  delivery_note_bn?: string | null;
+  delivery_note_en?: string | null;
 };
 
 export default function Settings() {
@@ -63,6 +67,10 @@ export default function Settings() {
         delivery_charge_outside_dhaka: settings.delivery_charge_outside_dhaka,
         delivery_mode: settings.delivery_mode ?? "advance",
         free_delivery_min: Number(settings.free_delivery_min ?? 0),
+        delivery_days_inside: settings.delivery_days_inside?.trim() || null,
+        delivery_days_outside: settings.delivery_days_outside?.trim() || null,
+        delivery_note_bn: settings.delivery_note_bn?.trim() || null,
+        delivery_note_en: settings.delivery_note_en?.trim() || null,
         cod_enabled: settings.cod_enabled
       })
       .eq("id", 1);
@@ -238,6 +246,43 @@ export default function Settings() {
           type="number"
           value={settings.free_delivery_min ?? 0}
           onChange={(e) => setSettings({ ...settings, free_delivery_min: Number(e.target.value) })}
+          className="input"
+        />
+      </Field>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">পণ্যের পেজে ডেলিভারি তথ্য</div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ঢাকার ভিতরে কত দিন">
+          <input
+            value={settings.delivery_days_inside ?? ""}
+            onChange={(e) => setSettings({ ...settings, delivery_days_inside: e.target.value })}
+            placeholder="২-৩ দিন"
+            className="input"
+          />
+        </Field>
+        <Field label="ঢাকার বাইরে কত দিন">
+          <input
+            value={settings.delivery_days_outside ?? ""}
+            onChange={(e) => setSettings({ ...settings, delivery_days_outside: e.target.value })}
+            placeholder="৩-৫ দিন"
+            className="input"
+          />
+        </Field>
+      </div>
+      <Field label="অতিরিক্ত নোট - বাংলা (ফাঁকা রাখলে দেখাবে না)">
+        <textarea
+          rows={2}
+          value={settings.delivery_note_bn ?? ""}
+          onChange={(e) => setSettings({ ...settings, delivery_note_bn: e.target.value })}
+          placeholder="যেমন: কুমিল্লার ভিতরে একই দিনে ডেলিভারি"
+          className="input"
+        />
+      </Field>
+      <Field label="অতিরিক্ত নোট - English (optional)">
+        <textarea
+          rows={2}
+          value={settings.delivery_note_en ?? ""}
+          onChange={(e) => setSettings({ ...settings, delivery_note_en: e.target.value })}
           className="input"
         />
       </Field>

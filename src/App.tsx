@@ -86,7 +86,7 @@ export default function App() {
         <Route path="featured-banners" element={<FeaturedBanners />} />
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="menu" element={<AdminMenu />} />
-        <Route path="faq" element={<FaqAdminPlaceholder />} />
+        <Route path="faq" element={<AdminFaq />} />
       </Route>
     </Routes>
     </>

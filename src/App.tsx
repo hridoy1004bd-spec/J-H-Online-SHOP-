@@ -14,6 +14,7 @@ import Orders from "./pages/customer/Orders";
 import Account from "./pages/customer/Account";
 import Reviews from "./pages/customer/Reviews";
 import FaqPage from "./pages/customer/Faq";
+import Favorites from "./pages/customer/Favorites";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/faq" element={<FaqPage />} />
+        <Route path="/favorites" element={<Favorites />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />

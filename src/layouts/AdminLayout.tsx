@@ -17,6 +17,7 @@ import {
   Star,
   ListOrdered,
   HelpCircle,
+  LayoutGrid,
   Menu,
   X,
   LogOut
@@ -50,7 +51,8 @@ export default function AdminLayout() {
     { to: "/admin/featured-banners", icon: Image, label: lang === "en" ? "Featured Banner" : "ফিচার্ড ব্যানার" },
     { to: "/admin/reviews", icon: Star, label: lang === "en" ? "Reviews" : "কাস্টমার রিভিউ" },
     { to: "/admin/menu", icon: ListOrdered, label: lang === "en" ? "Site Menu" : "মেনু ম্যানেজ" },
-    { to: "/admin/faq", icon: HelpCircle, label: lang === "en" ? "FAQ" : "সাধারণ প্রশ্ন (FAQ)" }
+    { to: "/admin/faq", icon: HelpCircle, label: lang === "en" ? "FAQ" : "সাধারণ প্রশ্ন (FAQ)" },
+    { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি" }
   ];
 
   return (

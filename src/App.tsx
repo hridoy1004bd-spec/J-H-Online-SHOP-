@@ -37,6 +37,7 @@ import FeaturedBanners from "./pages/admin/FeaturedBanners";
 import AdminReviews from "./pages/admin/AdminReviews";
 import AdminMenu from "./pages/admin/AdminMenu";
 import AdminFaq from "./pages/admin/AdminFaq";
+import AdminCategories from "./pages/admin/AdminCategories";
 
 function ThemeSync() {
   const { pathname } = useLocation();
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="menu" element={<AdminMenu />} />
         <Route path="faq" element={<AdminFaq />} />
+        <Route path="categories" element={<AdminCategories />} />
       </Route>
     </Routes>
     </>

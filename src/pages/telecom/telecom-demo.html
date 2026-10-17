@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>J H Telecom Reseller — ডেমো</title>
+<style>
+:root{--bg:#f5f6fa;--cd:#fff;--tx:#1b1f2a;--mu:#6b7280;--br:#e3e6ee;--pr:#0a7a5a;--wn:#b45309;--er:#c0262d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10131a;--cd:#1a1f2b;--tx:#e8ebf2;--mu:#9aa3b5;--br:#2b3242;--pr:#34c79a;--wn:#f0b45a;--er:#ff7b80}}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,"Noto Sans Bengali",sans-serif;padding-bottom:70px}
+header{background:var(--pr);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+header b{font-size:16px}.sw button{border:1px solid #fff8;background:#0003;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}.sw .on{background:#fff;color:var(--pr)}
+main{padding:12px;max-width:720px;margin:auto}.c{background:var(--cd);border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:10px}
+h3{margin:0 0 8px;font-size:15px}.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.mu{color:var(--mu);font-size:13px}
+.bal{display:grid;grid-template-columns:1fr 1fr;gap:8px}.bal div{background:var(--bg);border-radius:10px;padding:10px;font-size:20px;font-weight:700}.bal small{display:block;font-size:12px;color:var(--mu);font-weight:400}
+button,input,select{font:inherit}input,select{width:100%;padding:9px;border:1px solid var(--br);border-radius:8px;background:var(--bg);color:var(--tx);margin:3px 0 6px}
+.b{background:var(--pr);color:#fff;border:0;padding:8px 12px;border-radius:8px}.b.g{background:var(--bg);color:var(--tx);border:1px solid var(--br)}.b.r{background:var(--er)}
+.t{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;background:var(--bg);border:1px solid var(--br)}.Pending,.Processing{color:var(--wn)}.Approved,.Completed{color:var(--pr)}.Rejected,.Failed,.Suspended,.Cancelled{color:var(--er)}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--cd);border-top:1px solid var(--br);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}nav button{flex:1;border:0;background:none;color:var(--mu);padding:10px 2px;font-size:12px}nav .on{color:var(--pr);font-weight:700}
+.sec{background:var(--bg);border:1px dashed var(--br);border-radius:8px;padding:6px 8px;margin-top:6px;word-break:break-all;font-family:monospace;font-size:13px}
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90%}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--br);padding:5px;text-align:left;white-space:nowrap}.ph{display:none}
+@media print{header,nav,.np,#toast{display:none!important}.ph{display:block;margin-bottom:8px}body{background:#fff;color:#000}.c{border-color:#999}}
+</style></head><body>
+<header><b>📱 J H Telecom <span style="font-weight:400;font-size:12px">ডেমো</span></b><div class="sw"><button id="br" onclick="role('r')">রিসেলার</button><button id="ba" onclick="role('a')">অ্যাডমিন</button></div></header>
+<div id="toast"></div><main id="m"></main><nav id="n"></nav>
+<script>
+const $=id=>document.getElementById(id),P=[{id:1,n:'Dollar Card $10',i:'💳',p:{BDT:125000,SAR:4000}},{id:2,n:'Calling Card KSA→BD',i:'📞',p:{BDT:30000,SAR:1000}},{id:3,n:'VPN ১ মাস',i:'🔒',p:{BDT:20000,SAR:700}}];
+const K=[{n:'মোবাইল রিচার্জ ১০০',BDT:10000,SAR:350},{n:'ইন্টারনেট 10GB / ৩০ দিন',BDT:49900,SAR:1700},{n:'মিনিট ৩০০ / ৩০ দিন',BDT:29900,SAR:1000}];
+const M={BDT:'৳',SAR:'SAR '},f=(c,a)=>M[c]+(a/100).toFixed(2),now=()=>new Date().toLocaleString('en-GB');
+let S,R=(window.__ROLE||'r'),T=R=='a'?'o':'w';
+function init(){S={perm:{bKash:1,Nagad:1,Rocket:0,Bangladesh:1},rt:{com:3,chg:0,en:1},pan:'',cf:null,rs:'Pending',bal:{BDT:0,SAR:0},deps:[],led:[],ord:[],rc:[],st:{1:['DC-7F3A-91KQ','DC-22BX-55LM'],2:['PIN 4410 8832 1907'],3:['user: vpn_88 / pass: Xk9#2m']}}}init();
+function toast(x){const t=$('toast');t.textContent=x;t.style.display='block';clearTimeout(t.h);t.h=setTimeout(()=>t.style.display='none',2600)}
+function L(type,c,a,ref){S.bal[c]+=a;S.led.push({id:'L'+(S.led.length+1),t:now(),type,c,a,ref,by:R=='a'?'admin':'reseller'})}
+function role(x){R=x;T=x=='r'?'w':'o';draw()}function tab(x){T=x;draw()}
+const TR={w:'👛 ওয়ালেট',s:'🛍 পণ্য',c:'📶 রিচার্জ',h:'🧾 ইতিহাস'},TA={o:'📊 ওভারভিউ',a:'👤 আবেদন',d:'💰 ডিপজিট',q:'📲 অর্ডার',l:'📒 লেজার'};
+function can(){if(S.rs!='Approved'){toast('অ্যাকাউন্ট '+S.rs+' — লেনদেন/কেনা বন্ধ। অ্যাডমিন অনুমোদন দরকার');return false}return true}
+function dep(){if(!can())return;if(!S.perm[$('dm').value])return toast('এই মাধ্যমের পারমিশন নেই');const c=$('dc').value,a=Math.round(parseFloat($('da').value)*100),t=$('dt').value.trim();
+if(!(a>0)||t.length<6)return toast('সঠিক পরিমাণ ও ট্রানজেকশন ID (৬+ অক্ষর) দিন');
+if(S.deps.some(d=>d.t==t))return toast('এই ট্রানজেকশন ID আগেই ব্যবহৃত — ডুপ্লিকেট বাতিল');
+S.deps.push({id:'D'+(S.deps.length+1),m:$('dm').value,c,a,t,s:'Pending',n:''});toast('অনুরোধ জমা — ব্যালেন্স এখনো বাড়েনি, অ্যাডমিন যাচাই করবে');draw()}
+function dec(i,ok){const d=S.deps[i];if(d.s!='Pending')return toast('আগেই প্রক্রিয়া হয়েছে (ডুপ্লিকেট ক্রেডিট ঠেকানো হলো)');d.s=ok?'Approved':'Rejected';if(ok)L('Deposit',d.c,d.a,d.id+'/'+d.t);draw()}
+function buy(id,c){if(!can())return;const p=P.find(x=>x.id==id),a=p.p[c];if(!S.st[id].length)return toast('স্টক নেই');
+if(S.bal[c]<a)return toast(c+' ওয়ালেটে ব্যালেন্স কম (অন্য কারেন্সি ব্যবহার হবে না)');
+const sec=S.st[id].shift();L('Purchase',c,-a,'O'+(S.ord.length+1));S.ord.push({id:'O'+(S.ord.length+1),n:p.n,c,a,s:'Completed',sec,t:now()});toast('কেনা সম্পন্ন — ক্রেডেনশিয়াল ইতিহাসে');draw()}
+function rch(){if(!can())return;if(!S.perm.Bangladesh||!S.rt.en)return toast('বাংলাদেশ রিচার্জ বন্ধ আছে');const op=$('ro').value,no=$('rn').value.trim(),k0=K[$('rk').value],c=$('rcur').value,k={n:k0.n,[c]:Math.round(k0[c]*(1-S.rt.com/100))+S.rt.chg};
+if(!/^01[3-9]\d{8}$/.test(no))return toast('সঠিক ১১ সংখ্যার নম্বর দিন');if(S.bal[c]<k[c])return toast(c+' ব্যালেন্স কম');
+const id='R'+(S.rc.length+1);L('Recharge hold',c,-k[c],id);S.rc.push({id,op,no,n:k.n,c,a:k[c],s:'Pending',rf:0,ref:''});toast('অর্ডার তৈরি — অ্যাডমিন ম্যানুয়ালি প্রক্রিয়া করবে');draw()}
+function rs(i,s){const o=S.rc[i];if(['Completed','Failed','Cancelled'].includes(o.s))return;
+if(s=='Completed'){const r=$('rf'+i).value.trim();if(!r)return toast('সম্পন্ন করতে ফুলফিলমেন্ট রেফারেন্স লিখুন');o.ref=r}
+o.s=s;if(s!='Processing'&&s!='Completed'&&!o.rf){o.rf=1;L('Refund',o.c,o.a,o.id)}draw()}
+function adm(x){S.rs=x;toast('স্ট্যাটাস: '+x);draw()}
+function sum(arr,c,fn){return arr.filter(x=>x.c==c).reduce((s,x)=>s+fn(x),0)}
+function tbl(h,rows){return '<div class="tw"><table><tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('')+'</table></div>'}
+const tg=s=>'<span class="t '+s+'">'+s+'</span>';
+function view(){let h='';
+if(R=='r'){
+if(T=='w'){h+='<div class="c"><div class="row"><h3>অ্যাকাউন্ট: রহিম (KSA)</h3>'+tg(S.rs)+'</div><div class="mu">NID/ইকামা/সেলফি: 🔒 প্রাইভেট স্টোরেজ (পাবলিক URL নেই)</div>'+(S.rs!='Approved'?'<div class="mu" style="color:var(--wn)">⚠ অনুমোদনের আগে কেনা/ডিপজিট বন্ধ। অ্যাডমিন মোডে গিয়ে অনুমোদন দিন।</div>':'')+'</div>'+
+'<div class="c"><h3>ওয়ালেট (আলাদা ব্যালেন্স)</h3><div class="bal"><div><small>BDT</small>'+f('BDT',S.bal.BDT)+'</div><div><small>SAR</small>'+f('SAR',S.bal.SAR)+'</div></div></div>'+
+'<div class="c"><h3>ডিপজিট অনুরোধ</h3><select id="dm">'+['bKash','Nagad','Rocket'].filter(k=>S.perm[k]).map(k=>'<option>'+k+'</option>').join('')+'</select><select id="dc"><option>BDT</option><option>SAR</option></select><input id="da" type="number" placeholder="পরিমাণ (যেমন 2000)"><input id="dt" placeholder="ট্রানজেকশন ID (যেমন 9A7B2C41)"><button class="b" onclick="dep()">জমা দিন</button></div>'+
+'<div class="c"><h3>আমার ডিপজিট</h3>'+(S.deps.length?tbl(['ID','মাধ্যম','পরিমাণ','স্ট্যাটাস'],S.deps.map(d=>[d.id,d.m,f(d.c,d.a),tg(d.s)])):'<span class="mu">কোনো ডিপজিট নেই</span>')+'</div>'}
+if(T=='s')h+='<div class="mu" style="margin-bottom:6px">কেনার আগে ক্রেডেনশিয়াল লুকানো থাকে।</div>'+P.map(p=>'<div class="c"><div class="row"><h3>'+p.i+' '+p.n+'</h3><span class="mu">স্টক: '+S.st[p.id].length+'</span></div><div class="mu">🔒 কোড/পাসওয়ার্ড পেমেন্টের পর দেখা যাবে</div><div class="row" style="margin-top:8px"><button class="b" onclick="buy('+p.id+',\'BDT\')">'+f('BDT',p.p.BDT)+' এ কিনুন</button><button class="b g" onclick="buy('+p.id+',\'SAR\')">'+f('SAR',p.p.SAR)+' এ কিনুন</button></div></div>').join('');
+if(T=='c')h+='<div class="c"><h3>বাংলাদেশ রিচার্জ (ম্যানুয়াল)</h3><select id="ro"><option>Grameenphone</option><option>Robi</option><option>Banglalink</option><option>Airtel</option></select><input id="rn" placeholder="মোবাইল নম্বর 01XXXXXXXXX" inputmode="numeric"><select id="rk">'+K.map((k,i)=>'<option value="'+i+'">'+k.n+' — '+f('BDT',k.BDT)+' / '+f('SAR',k.SAR)+'</option>').join('')+'</select><select id="rcur"><option>BDT</option><option>SAR</option></select><button class="b" onclick="rch()">অর্ডার দিন</button></div><div class="c"><h3>রিচার্জ অর্ডার</h3>'+(S.rc.length?tbl(['ID','নম্বর','প্যাকেজ','মূল্য','স্ট্যাটাস'],S.rc.map(o=>[o.id,o.no,o.n,f(o.c,o.a),tg(o.s)])):'<span class="mu">নেই</span>')+'</div>';
+if(T=='h')h+='<div class="c"><h3>আমার কেনা পণ্য</h3>'+(S.ord.length?S.ord.map(o=>'<div style="margin-bottom:8px"><b>'+o.id+' · '+o.n+'</b> '+tg(o.s)+' <span class="mu">'+f(o.c,o.a)+'</span><div class="sec">'+o.sec+'</div></div>').join(''):'<span class="mu">নেই</span>')+'</div><div class="c"><h3>ওয়ালেট লেনদেন</h3>'+ledT()+'</div>';
+}else{
+if(T=='o'){const x=c=>'<div><small>'+c+'</small>'+f(c,sum(S.led.filter(l=>l.type=='Deposit'),c,l=>l.a))+'<small>ডিপজিট</small>'+f(c,-sum(S.led.filter(l=>l.type=='Purchase'),c,l=>l.a))+'<small>বিক্রি</small></div>';
+h+='<div class="c"><h3>টেলিকম ওভারভিউ</h3><div class="bal">'+x('BDT')+x('SAR')+'</div><div class="mu" style="margin-top:6px">BDT ও SAR কখনো যোগ করা হয় না। রিসেলার: '+S.rs+' · পেন্ডিং ডিপজিট: '+S.deps.filter(d=>d.s=='Pending').length+' · পেন্ডিং রিচার্জ: '+S.rc.filter(o=>o.s=='Pending').length+'</div></div><div class="c np"><h3>রেট সেটিংস (ডেমো)</h3><div class="mu">কনভার্সন বন্ধ। চালু করলে আলাদা কনভার্সন লেনদেন ও নিশ্চিতকরণ লাগবে।</div></div><button class="b np" onclick="print()">⬇ PDF এক্সপোর্ট</button>'}
+if(T=='a')h+='<div class="c"><div class="row"><h3>রহিম · KSA · +966…</h3>'+tg(S.rs)+'</div><div class="mu">NID ছবি/সেলফি: প্রাইভেট, শুধু অ্যাডমিন সার্ভার-অনুমতিতে</div>'+menu()+'<div class="row" style="margin-top:8px"><button class="b" onclick="adm(\'Approved\')">অনুমোদন</button><button class="b r" onclick="adm(\'Rejected\')">বাতিল</button><button class="b g" onclick="adm(\'Suspended\')">সাসপেন্ড</button></div></div>';
+if(T=='d')h+='<div class="c"><h3>ডিপজিট যাচাই</h3>'+(S.deps.length?S.deps.map((d,i)=>'<div class="row" style="border-bottom:1px solid var(--br);padding:6px 0"><span>'+d.id+' · '+d.m+' · '+f(d.c,d.a)+'<br><span class="mu">TrxID: '+d.t+'</span></span>'+(d.s=='Pending'?'<span><button class="b" onclick="dec('+i+',1)">ক্রেডিট</button> <button class="b r" onclick="dec('+i+',0)">বাতিল</button></span>':tg(d.s))+'</div>').join(''):'<span class="mu">নেই</span>')+'</div>';
+if(T=='q')h+='<div class="c"><h3>রিচার্জ অর্ডার</h3>'+(S.rc.length?S.rc.map((o,i)=>{const e=['Completed','Failed','Cancelled'].includes(o.s);return '<div style="border-bottom:1px solid var(--br);padding:6px 0"><div class="row"><span>'+o.id+' · '+o.op+' '+o.no+'<br><span class="mu">'+o.n+' · '+f(o.c,o.a)+'</span></span>'+tg(o.s)+'</div>'+(e?(o.ref?'<div class="mu">রেফ: '+o.ref+'</div>':'')+(o.rf?'<div class="mu">রিফান্ড হয়েছে (একবারই)</div>':''):'<input id="rf'+i+'" placeholder="ফুলফিলমেন্ট রেফারেন্স"><div class="row"><button class="b g" onclick="rs('+i+',\'Processing\')">প্রসেসিং</button><button class="b" onclick="rs('+i+',\'Completed\')">সম্পন্ন</button><button class="b r" onclick="rs('+i+',\'Failed\')">ব্যর্থ+রিফান্ড</button></div>')+'</div>'}).join(''):'<span class="mu">নেই</span>')+'</div>';
+if(T=='l')h+='<div class="c"><h3>লেজার ও রিপোর্ট</h3>'+ledT()+'<div class="mu" style="margin-top:6px">মোট ব্যালেন্স — BDT: '+f('BDT',S.bal.BDT)+' | SAR: '+f('SAR',S.bal.SAR)+'</div></div><button class="b np" onclick="print()">⬇ PDF এক্সপোর্ট / প্রিন্ট</button> <button class="b g np" onclick="init();draw();toast(\'ডেমো রিসেট\')">↺ রিসেট</button>';
+}
+return '<div class="ph"><b>J H Telecom — রিপোর্ট</b><br>তৈরি: '+now()+'</div>'+h}
+function ledT(){return S.led.length?tbl(['ID','সময়','ধরন','কারেন্সি','পরিমাণ','রেফ'],S.led.map(l=>[l.id,l.t,l.type,l.c,(l.a<0?'−':'+')+f(l.c,Math.abs(l.a)),l.ref])):'<span class="mu">কোনো লেনদেন নেই</span>'}
+const AP={pay:'💵 Add Payment',his:'🧾 History',edt:'✏ Edit',rat:'⚙ Rates',det:'ℹ Details'};
+function menu(){let h='<div class="row np" style="margin:8px 0;gap:4px;justify-content:flex-start">'+Object.keys(AP).map(k=>'<button class="b '+(S.pan==k?'':'g')+'" onclick="S.pan=\''+k+'\';S.cf=null;draw()">'+AP[k]+'</button>').join('')+'</div>',p=S.pan,x=S.cf;
+if(p=='pay')h+=x?'<div class="c"><h3>Payment Confirm</h3>Reseller: রহিম<br>Current Bal.: '+f(x.c,S.bal[x.c])+'<br>Amount: '+f(x.c,x.a)+'<br>Type: Payment<br>Description: '+x.d+'<input id="ap" type="password" placeholder="অ্যাডমিন পাসওয়ার্ড (ডেমো: ৪+ অক্ষর)"><button class="b" onclick="pc()">নিশ্চিত</button> <button class="b g" onclick="S.cf=null;draw()">বাতিল</button></div>':'<div class="c"><select id="pcur"><option>BDT</option><option>SAR</option></select><input id="pa" type="number" placeholder="পরিমাণ"><input id="pd" placeholder="বিবরণ"><button class="b" onclick="pn()">পরবর্তী</button></div>';
+if(p=='his')h+='<div class="c">'+ledT()+'</div>';
+if(p=='edt')h+='<div class="c"><h3>সার্ভিস পারমিশন</h3>'+['bKash','Nagad','Rocket','Bangladesh'].map(k=>'<label style="display:block;padding:6px 0"><input type="checkbox" style="width:auto" '+(S.perm[k]?'checked':'')+' onchange="S.perm[\''+k+'\']=this.checked?1:0;toast(\'সংরক্ষিত\')"> '+k+'</label>').join('')+'</div>';
+if(p=='rat')h+='<div class="c"><h3>Bangladesh রিচার্জ রেট</h3>Commission %<input id="rcm" type="number" value="'+S.rt.com+'">Charge (ফ্ল্যাট)<input id="rcg" type="number" value="'+S.rt.chg/100+'"><label><input id="ren" type="checkbox" style="width:auto" '+(S.rt.en?'checked':'')+'> Enable</label><br><button class="b" onclick="sv()">Submit</button><div class="mu">খরচ = দাম − কমিশন% + চার্জ</div></div>';
+if(p=='det')h+='<div class="c">নাম: রহিম<br>দেশ: KSA<br>স্ট্যাটাস: '+S.rs+'<br>BDT: '+f('BDT',S.bal.BDT)+' | SAR: '+f('SAR',S.bal.SAR)+'<br>অর্ডার: '+S.ord.length+' + রিচার্জ '+S.rc.length+'</div>';
+return h}
+function pn(){const c=$('pcur').value,a=Math.round(parseFloat($('pa').value)*100);if(!(a>0))return toast('সঠিক পরিমাণ দিন');S.cf={c,a,d:$('pd').value||'-'};draw()}
+function pc(){if(S.rs!='Approved')return toast('অ্যাকাউন্ট '+S.rs+' — ওয়ালেট লেনদেন বন্ধ');if($('ap').value.length<4)return toast('অ্যাডমিন পাসওয়ার্ড দিন');const x=S.cf;if(!x)return;S.cf=null;L('Admin payment',x.c,x.a,x.d);toast('পেমেন্ট যোগ হয়েছে');draw()}
+function sv(){S.rt={com:Math.max(0,Math.min(50,parseFloat($('rcm').value)||0)),chg:Math.round((parseFloat($('rcg').value)||0)*100),en:$('ren').checked?1:0};toast('রেট সংরক্ষিত');draw()}
+function draw(){$('br').className=R=='r'?'on':'';$('ba').className=R=='a'?'on':'';const t=R=='r'?TR:TA;$('n').innerHTML=Object.keys(t).map(k=>'<button class="'+(k==T?'on':'')+'" onclick="tab(\''+k+'\')">'+t[k]+'</button>').join('');$('m').innerHTML=view()}
+draw();
+if(window.__ROLE){$(window.__ROLE=='a'?'br':'ba').style.display='none'}
+</script></body></html>

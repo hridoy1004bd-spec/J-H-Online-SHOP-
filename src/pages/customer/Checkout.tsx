@@ -5,7 +5,7 @@ import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
-import { otpService } from "../../services/otpService";
+import { otpService, signupErrorMessage } from "../../services/otpService";
 import { orderService } from "../../services/orderService";
 import { supabase, FUNCTIONS_URL } from "../../lib/supabase";
 import { isNonEmpty, isValidBangladeshiMobile } from "../../utils/validation";
@@ -144,6 +144,11 @@ export default function Checkout() {
   const [password, setPassword] = useState("");
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [otpRequired, setOtpRequired] = useState(true);
+
+  useEffect(() => {
+    otpService.getOtpRequired().then(setOtpRequired);
+  }, []);
 
   const [fullAddress, setFullAddress] = useState("");
   const [area, setArea] = useState("");
@@ -235,6 +240,27 @@ export default function Checkout() {
     if (!res.success) return showToast(res.error || t("error"), "error");
     setDevOtpHint(res.devMode ? res.devOtp ?? null : null);
     setStep("otp");
+  }
+
+  async function handleSignupNoOtp() {
+    if (!isNonEmpty(name)) return showToast(t("yourName"), "error");
+    if (!isValidBangladeshiMobile(mobile)) return showToast(t("mobileNumber"), "error");
+    if (password.length < 6) {
+      showToast(
+        lang === "en" ? "Password must be at least 6 characters" : "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন",
+        "error"
+      );
+      return;
+    }
+    setSending(true);
+    const res = await otpService.signupWithPassword(mobile, name.trim(), password);
+    setSending(false);
+    if (!res.success) {
+      if (res.code === "ACCOUNT_EXISTS") setLoginMode("login");
+      return showToast(signupErrorMessage(res.code, lang), "error");
+    }
+    await refreshCustomer();
+    setStep("address");
   }
 
   async function handleVerifyOtp() {
@@ -477,15 +503,28 @@ export default function Checkout() {
               >
                 {sending ? t("loading") : lang === "en" ? "Login" : "লগইন করুন"}
               </button>
-              <button
-                type="button"
-                onClick={() => setLoginMode("signup")}
-                className="w-full text-[11px] text-teal font-semibold"
-              >
-                {lang === "en"
-                  ? "Forgot password / ordered before without a password? Tap here"
-                  : "পাসওয়ার্ড ভুলে গেছেন বা আগে অর্ডার করেছেন কিন্তু পাসওয়ার্ড নেই? এখানে চাপুন"}
-              </button>
+              {otpRequired ? (
+                <button
+                  type="button"
+                  onClick={() => setLoginMode("signup")}
+                  className="w-full text-[11px] text-teal font-semibold"
+                >
+                  {lang === "en"
+                    ? "Forgot password / ordered before without a password? Tap here"
+                    : "পাসওয়ার্ড ভুলে গেছেন বা আগে অর্ডার করেছেন কিন্তু পাসওয়ার্ড নেই? এখানে চাপুন"}
+                </button>
+              ) : (
+                <a
+                  href={`https://wa.me/${ADMIN_WHATSAPP_NUMBER}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-center w-full text-[11px] text-teal font-semibold"
+                >
+                  {lang === "en"
+                    ? "Forgot password? Message us on WhatsApp and we will reset it"
+                    : "পাসওয়ার্ড ভুলে গেছেন? WhatsApp-এ জানান, আমরা রিসেট করে দেব"}
+                </a>
+              )}
             </>
           ) : (
             <>
@@ -509,12 +548,26 @@ export default function Checkout() {
                 />
               </Field>
               <div className="text-[11px] text-mute -mt-2">
-                {lang === "en"
-                  ? "Already have an account? Enter your number and a new password here to set it."
-                  : "আগে থেকে অ্যাকাউন্ট থাকলে একই নম্বরে নতুন পাসওয়ার্ড দিন, সেটাই আপনার পাসওয়ার্ড হবে।"}
+                {otpRequired
+                  ? lang === "en"
+                    ? "Already have an account? Enter your number and a new password here to set it."
+                    : "আগে থেকে অ্যাকাউন্ট থাকলে একই নম্বরে নতুন পাসওয়ার্ড দিন, সেটাই আপনার পাসওয়ার্ড হবে।"
+                  : lang === "en"
+                  ? "Already have an account? Use the Login tab above."
+                  : "আগে থেকে অ্যাকাউন্ট থাকলে ওপরের লগইন ট্যাব ব্যবহার করুন।"}
               </div>
-              <button onClick={handleSendOtp} disabled={sending} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60">
-                {sending ? t("loading") : t("sendOtp")}
+              <button
+                onClick={otpRequired ? handleSendOtp : handleSignupNoOtp}
+                disabled={sending}
+                className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60"
+              >
+                {sending
+                  ? t("loading")
+                  : otpRequired
+                  ? t("sendOtp")
+                  : lang === "en"
+                  ? "Create Account & Continue"
+                  : "অ্যাকাউন্ট খুলে এগিয়ে যান"}
               </button>
             </>
           )}

@@ -1,15 +1,16 @@
 import React from "react";
-import { Smartphone } from "lucide-react";
+import demoHtml from "../telecom/telecom-demo.html?raw";
+
+// ডেমো: ডেটা শুধু ব্রাউজারের মেমোরিতে থাকে, ডাটাবেসে কিছু যায় না।
+const html = demoHtml.replace("<body>", "<body><script>window.__ROLE='a'</script>");
 
 export default function AdminTelecom() {
   return (
-    <div className="max-w-lg">
-      <h1 className="font-extrabold text-lg mb-4 flex items-center gap-2">
-        <Smartphone size={20} className="text-teal" /> J H Telecom Reseller
-      </h1>
-      <div className="bg-white border border-border rounded-2xl p-5 text-sm text-mute">
-        এই পেইজ এখন ফাঁকা। পরে এখানে রিসেলার, রিচার্জ ও হিসাবের কাজ যুক্ত হবে।
-      </div>
-    </div>
+    <iframe
+      title="J H Telecom Reseller Admin"
+      srcDoc={html}
+      className="w-full border-0 block rounded-xl"
+      style={{ height: "calc(100dvh - 90px)" }}
+    />
   );
 }

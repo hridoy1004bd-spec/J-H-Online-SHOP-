@@ -18,6 +18,7 @@ import {
   ListOrdered,
   HelpCircle,
   LayoutGrid,
+  Smartphone,
   Menu,
   X,
   LogOut
@@ -52,7 +53,8 @@ export default function AdminLayout() {
     { to: "/admin/reviews", icon: Star, label: lang === "en" ? "Reviews" : "কাস্টমার রিভিউ" },
     { to: "/admin/menu", icon: ListOrdered, label: lang === "en" ? "Site Menu" : "মেনু ম্যানেজ" },
     { to: "/admin/faq", icon: HelpCircle, label: lang === "en" ? "FAQ" : "সাধারণ প্রশ্ন (FAQ)" },
-    { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি" }
+    { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি" },
+    { to: "/admin/telecom", icon: Smartphone, label: "J H Telecom Reseller" }
   ];
 
   return (

@@ -22,6 +22,7 @@ type StoreSettings = BaseSettings & {
   delivery_days_outside?: string | null;
   delivery_note_bn?: string | null;
   delivery_note_en?: string | null;
+  otp_required?: boolean | null;
 };
 
 export default function Settings() {
@@ -71,7 +72,8 @@ export default function Settings() {
         delivery_days_outside: settings.delivery_days_outside?.trim() || null,
         delivery_note_bn: settings.delivery_note_bn?.trim() || null,
         delivery_note_en: settings.delivery_note_en?.trim() || null,
-        cod_enabled: settings.cod_enabled
+        cod_enabled: settings.cod_enabled,
+        otp_required: settings.otp_required !== false
       })
       .eq("id", 1);
     setSaving(false);
@@ -286,6 +288,32 @@ export default function Settings() {
           className="input"
         />
       </Field>
+
+      <div className="text-xs font-bold text-mute uppercase mt-2 mb-2">কাস্টমার সাইনআপ</div>
+      <div className="space-y-2 mb-4">
+        {(
+          [
+            [false, "ওটিপি ছাড়া (মোবাইল + পাসওয়ার্ড)", "কাস্টমার মোবাইল নম্বর, নাম আর পাসওয়ার্ড দিয়ে সাথে সাথে অ্যাকাউন্ট খুলবে। নম্বর যাচাই হয় না, তাই ভুয়া নম্বর আসতে পারে। অর্ডারের পর ফোন করে নিশ্চিত করুন।"],
+            [true, "ওটিপি আবশ্যক (SMS)", "সাইনআপে মোবাইলে SMS কোড লাগবে। এটা চালু করার আগে SMS প্রোভাইডার সেট করতে হবে, নইলে কেউ নতুন অ্যাকাউন্ট খুলতে পারবে না।"]
+          ] as const
+        ).map(([val, title, sub]) => {
+          const on = (settings.otp_required !== false) === val;
+          return (
+            <button
+              key={String(val)}
+              type="button"
+              onClick={() => setSettings({ ...settings, otp_required: val })}
+              className={`press w-full text-left rounded-xl border p-3 ${on ? "bg-teal-tint border-teal" : "bg-white border-border"}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-4 h-4 rounded-full border-2 ${on ? "border-teal bg-teal" : "border-mute"}`} />
+                <span className="text-sm font-extrabold">{title}</span>
+              </div>
+              <div className="text-[11px] text-mute mt-1 ml-6">{sub}</div>
+            </button>
+          );
+        })}
+      </div>
 
       <label className="flex items-center gap-2 my-4">
         <input

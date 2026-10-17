@@ -16,6 +16,7 @@ import Reviews from "./pages/customer/Reviews";
 import FaqPage from "./pages/customer/Faq";
 import Favorites from "./pages/customer/Favorites";
 import TrackOrder from "./pages/customer/TrackOrder";
+import TelecomReseller from "./pages/customer/TelecomReseller";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -38,6 +39,7 @@ import AdminReviews from "./pages/admin/AdminReviews";
 import AdminMenu from "./pages/admin/AdminMenu";
 import AdminFaq from "./pages/admin/AdminFaq";
 import AdminCategories from "./pages/admin/AdminCategories";
+import AdminTelecom from "./pages/admin/AdminTelecom";
 
 function ThemeSync() {
   const { pathname } = useLocation();
@@ -65,6 +67,7 @@ export default function App() {
         <Route path="/faq" element={<FaqPage />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/track" element={<TrackOrder />} />
+        <Route path="/telecom" element={<TelecomReseller />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -89,6 +92,7 @@ export default function App() {
         <Route path="menu" element={<AdminMenu />} />
         <Route path="faq" element={<AdminFaq />} />
         <Route path="categories" element={<AdminCategories />} />
+        <Route path="telecom" element={<AdminTelecom />} />
       </Route>
     </Routes>
     </>

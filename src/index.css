@@ -69,3 +69,8 @@ html.dark .input { background-color: #1E2830; color: #E6ECEF; border-color: #2A3
 html.dark input, html.dark textarea, html.dark select { color: #E6ECEF; }
 html.dark input::placeholder, html.dark textarea::placeholder { color: #7B8794; }
 html.dark header .bg-white.rounded-full { background-color: #fff; }
+/* ডার্ক মোডে ঝাপসা/ছোট অপাসিটির লেখা (text-ink/80 ইত্যাদি) পড়া যেত না, তাই এগুলো ঠিক করা হলো */
+html.dark .text-ink\/70, html.dark .text-ink\/80, html.dark .text-ink\/85 { color: #C9D3DA; }
+html.dark .text-gray-400 { color: #7B8794; }
+html.dark .text-gray-300 { color: #4A5661; }
+html.dark .bg-\[\#F1F1F1\] { background-color: #1E2830; }

@@ -92,6 +92,14 @@ export default function ProductDetails() {
   );
   const variantId = selectedVariant?.id ?? null;
   const stock = stockForVariant(product, variantId);
+  const allVariants = product.product_variants ?? [];
+  const qtyOf = (vid: string) => {
+    const r = product.inventory?.find((i) => i.variant_id === vid);
+    return r ? Math.max(0, r.quantity - r.reserved) : 0;
+  };
+  // সাইজ/কালার শেষ কি না (বাকিগুলো অর্ডার করা যাবে)
+  const sizeSoldOut = (s: string) => !allVariants.some((v) => v.size === s && (!color || v.color === color) && qtyOf(v.id) > 0);
+  const colorSoldOut = (c: string) => !allVariants.some((v) => v.color === c && (!size || v.size === size) && qtyOf(v.id) > 0);
   const discount = discountPct(product.old_price, product.current_price);
 
   function requireSelection() {
@@ -191,6 +199,10 @@ export default function ProductDetails() {
         <div className="mt-2">
           {stock > 0 ? (
             <span className="text-xs font-semibold text-green-600">{t("inStock")}</span>
+          ) : selectedVariant ? (
+            <span className="text-xs font-semibold text-red-500">
+              {lang === "bn" ? "এই সাইজ/কালারের স্টক শেষ। অন্যটা বেছে নিন।" : "This size/color is out of stock. Please choose another."}
+            </span>
           ) : (
             <span className="text-xs font-semibold text-red-500">{t("outOfStock")}</span>
           )}
@@ -200,17 +212,24 @@ export default function ProductDetails() {
           <div className="mt-4">
             <div className="text-xs font-bold text-mute mb-2">{t("size")}</div>
             <div className="flex gap-2 flex-wrap">
-              {sizes.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(s)}
-                  className={`press px-4 py-1.5 rounded-lg text-sm font-semibold border ${
-                    size === s ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              {sizes.map((s) => {
+                const out = sizeSoldOut(s);
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setSize(s);
+                      setQty(1);
+                    }}
+                    className={`press px-4 py-1.5 rounded-lg text-sm font-semibold border ${
+                      size === s ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
+                    } ${out ? "opacity-50" : ""}`}
+                  >
+                    <span className={out ? "line-through" : ""}>{s}</span>
+                    {out && <span className="block text-[9px] font-bold text-red-500 no-underline">{lang === "bn" ? "শেষ" : "Out"}</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -225,16 +244,21 @@ export default function ProductDetails() {
               {colors.map((c) => {
                 const img = colorImage(c);
                 const active = color === c;
+                const out = colorSoldOut(c);
                 return img ? (
                   <button
                     key={c}
                     onClick={() => {
                       setColor(c);
                       setPreviewUrl(img);
+                      setQty(1);
                     }}
-                    className={`press w-16 h-16 rounded-xl overflow-hidden border-2 ${active ? "border-orange" : "border-border"}`}
+                    className={`press relative w-16 h-16 rounded-xl overflow-hidden border-2 ${active ? "border-orange" : "border-border"} ${out ? "opacity-50" : ""}`}
                   >
                     <img src={img} alt={c} loading="lazy" className="w-full h-full object-cover" />
+                    {out && (
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center">{lang === "bn" ? "শেষ" : "Out"}</span>
+                    )}
                   </button>
                 ) : (
                   <button
@@ -242,12 +266,14 @@ export default function ProductDetails() {
                     onClick={() => {
                       setColor(c);
                       setPreviewUrl(null);
+                      setQty(1);
                     }}
                     className={`press px-4 py-1.5 rounded-lg text-sm font-semibold border ${
                       active ? "bg-teal text-white border-teal" : "bg-white text-ink border-border"
-                    }`}
+                    } ${out ? "opacity-50" : ""}`}
                   >
-                    {c}
+                    <span className={out ? "line-through" : ""}>{c}</span>
+                    {out && <span className="block text-[9px] font-bold text-red-500">{lang === "bn" ? "শেষ" : "Out"}</span>}
                   </button>
                 );
               })}

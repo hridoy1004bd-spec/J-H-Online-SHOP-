@@ -39,6 +39,10 @@ export default function EditProduct() {
 
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const [variantSaving, setVariantSaving] = useState(false);
+  const [bulkSizes, setBulkSizes] = useState("");
+  const [bulkColors, setBulkColors] = useState("");
+  const [bulkQty, setBulkQty] = useState("10");
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const productPath = id ? `/product/${id}` : "";
 
@@ -237,6 +241,77 @@ export default function EditProduct() {
     setVariants((vs) => vs.map((r) => (r.color === color ? { ...r, imageUrl: "" } : r)));
   }
 
+  function toVariantRows(list: any[]): VariantRow[] {
+    return (list ?? []).map((v: any) => {
+      const inv = (v.inventory ?? [])[0];
+      return {
+        id: v.id,
+        size: v.size ?? "",
+        color: v.color ?? "",
+        quantity: inv ? Math.max(0, inv.quantity - inv.reserved) : 0,
+        imageUrl: v.image_url ?? "",
+        inventoryId: inv?.id ?? null
+      };
+    });
+  }
+
+  async function reloadVariants() {
+    if (!id) return;
+    const { data } = await supabase.from("product_variants").select("*, inventory(*)").eq("product_id", id);
+    setVariants(toVariantRows((data as any[]) ?? []));
+  }
+
+  // একসাথে সাইজ × কালার যোগ করুন (যেগুলো আগে থেকেই আছে সেগুলো বাদ যাবে, কিছু মুছবে না)
+  async function addBulk() {
+    if (!id) return;
+    const split = (x: string) => x.split(",").map((p) => p.trim()).filter(Boolean);
+    const sizeList = split(bulkSizes);
+    const colorList = split(bulkColors);
+    if (sizeList.length === 0 && colorList.length === 0) {
+      return showToast(lang === "en" ? "Enter sizes and/or colors" : "সাইজ বা কালার লিখুন", "error");
+    }
+    const combos: { size: string | null; color: string | null }[] =
+      sizeList.length === 0
+        ? colorList.map((c) => ({ size: null, color: c }))
+        : colorList.length === 0
+        ? sizeList.map((s) => ({ size: s, color: null }))
+        : sizeList.flatMap((s) => colorList.map((c) => ({ size: s, color: c })));
+    const key = (sz: string | null, co: string | null) => `${(sz ?? "").trim().toLowerCase()}|${(co ?? "").trim().toLowerCase()}`;
+    const have = new Set(variants.map((v) => key(v.size, v.color)));
+    const todo = combos.filter((c) => !have.has(key(c.size, c.color)));
+    if (todo.length === 0) {
+      return showToast(lang === "en" ? "All of these already exist" : "এগুলো সব আগেই আছে", "error");
+    }
+    const qty = Math.max(0, Number(bulkQty) || 0);
+    setBulkSaving(true);
+    try {
+      for (const c of todo) {
+        const sameColorImg = c.color
+          ? variants.find((v) => v.color.trim().toLowerCase() === c.color!.toLowerCase() && v.imageUrl)?.imageUrl ?? null
+          : null;
+        const { data: v, error } = await supabase
+          .from("product_variants")
+          .insert({ product_id: id, size: c.size, color: c.color, image_url: sameColorImg })
+          .select()
+          .single();
+        if (error) throw error;
+        const { error: e2 } = await supabase
+          .from("inventory")
+          .insert({ product_id: id, variant_id: v.id, quantity: qty, reserved: 0 });
+        if (e2) throw e2;
+      }
+      setBulkSizes("");
+      setBulkColors("");
+      await reloadVariants();
+      showToast(lang === "en" ? `${todo.length} added` : `${todo.length}টি যোগ হয়েছে`, "success");
+    } catch (err: any) {
+      await reloadVariants();
+      showToast(err.message || t("error"), "error");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function deleteVariantRow(idx: number) {
     const row = variants[idx];
     if (row.id) {
@@ -387,6 +462,27 @@ export default function EditProduct() {
           {lang === "en" ? "Add sizes and colors, set stock for each." : "সাইজ ও কালার যোগ করুন, প্রতিটার স্টক বসান।"}
         </div>
 
+        <div className="bg-teal-tint border border-teal/20 rounded-xl p-3 mb-3">
+          <div className="text-xs font-bold text-teal-dark mb-1.5">
+            {lang === "en" ? "Quick add (sizes × colors)" : "একসাথে যোগ করুন (সাইজ × কালার)"}
+          </div>
+          <div className="text-[11px] text-mute mb-2">
+            {lang === "en"
+              ? "Comma separated. Leave color empty if the product has no color — the product photos are used then. Existing ones are skipped."
+              : "কমা দিয়ে লিখুন। কালার না থাকলে ফাঁকা রাখুন, তখন পণ্যের ছবিই দেখাবে। যেগুলো আগে থেকে আছে সেগুলো বাদ যাবে, কিছু মুছবে না।"}
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input value={bulkSizes} onChange={(e) => setBulkSizes(e.target.value)} placeholder={lang === "en" ? "Sizes: M, L, XL" : "সাইজ: M, L, XL"} className="input" />
+            <input value={bulkColors} onChange={(e) => setBulkColors(e.target.value)} placeholder={lang === "en" ? "Colors (optional)" : "কালার (ঐচ্ছিক)"} className="input" />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="number" value={bulkQty} onChange={(e) => setBulkQty(e.target.value)} placeholder={lang === "en" ? "Stock each" : "প্রতিটার স্টক"} className="input w-28" />
+            <button onClick={addBulk} disabled={bulkSaving} className="press flex-1 bg-teal text-white text-sm font-bold py-2.5 rounded-xl disabled:opacity-60">
+              {bulkSaving ? t("loading") : lang === "en" ? "Add all" : "সব যোগ করুন"}
+            </button>
+          </div>
+        </div>
+
         <div className="space-y-2 mb-3">
           {variants.map((row, idx) => (
             <div key={idx} className="bg-white border border-border rounded-xl p-3">
@@ -421,6 +517,12 @@ export default function EditProduct() {
                 <Trash2 size={16} />
               </button>
               </div>
+              {row.quantity <= 0 && (
+                <div className="text-[11px] font-bold text-red-500 mt-1.5">
+                  {lang === "en" ? "Out of stock — customers will see “stock finished” for this one" : "স্টক শেষ — কাস্টমার এটা বেছে নিলে “স্টক শেষ” দেখবে"}
+                </div>
+              )}
+              {row.color.trim() !== "" && variants.findIndex((v) => v.color.trim() === row.color.trim()) === idx && (
               <div className="flex items-center gap-2 mt-2">
                 {row.imageUrl ? (
                   <img src={row.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover border border-border shrink-0" />
@@ -430,7 +532,7 @@ export default function EditProduct() {
                 <input
                   value={row.imageUrl}
                   onChange={(e) => updateVariantRow(idx, { imageUrl: e.target.value })}
-                  placeholder={lang === "en" ? "Color image URL" : "রঙের ছবির লিংক"}
+                  placeholder={lang === "en" ? "Photo for this color (all sizes)" : "এই কালারের ছবি (সব সাইজে বসবে)"}
                   className="input flex-1 min-w-0 text-xs"
                 />
                 <label className="press bg-teal-tint text-teal-dark rounded-lg p-2.5 cursor-pointer shrink-0">
@@ -438,6 +540,7 @@ export default function EditProduct() {
                   <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => uploadVariantImage(idx, e.target.files?.[0])} />
                 </label>
               </div>
+              )}
             </div>
           ))}
         </div>

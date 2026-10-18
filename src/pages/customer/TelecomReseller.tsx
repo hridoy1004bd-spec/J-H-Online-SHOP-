@@ -1,38 +1,60 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Smartphone } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, Copy, Eye, EyeOff, Smartphone } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
+import TelecomReceipt, { ReceiptData } from "../../components/TelecomReceipt";
 import {
   Cur,
-  METHODS,
+  METHOD_COLOR,
   OPERATORS,
+  PACK_CATEGORIES,
+  PinError,
   TelDeposit,
   TelLedger,
   TelOrder,
   TelPack,
+  TelPayMethod,
   TelProduct,
   TelRecharge,
   TelReseller,
   TelSettings,
+  copyText,
+  detectOperator,
   fmtDate,
+  fmtDay,
+  isExpired,
   money,
+  parseSecret,
+  secretToText,
   telErr,
   telRpc,
+  telRpcPin,
   toMinor
 } from "../../services/telecomService";
 
-type Tab = "w" | "s" | "c" | "h";
-const TABS: { k: Tab; label: string }[] = [
-  { k: "w", label: "👛 ওয়ালেট" },
-  { k: "s", label: "🛍 পণ্য" },
-  { k: "c", label: "📶 রিচার্জ" },
-  { k: "h", label: "🧾 ইতিহাস" }
+type View = "home" | "deposit" | "shop" | "recharge" | "history" | "ledger" | "pin";
+
+const TILES: { k: View; icon: string; label: string }[] = [
+  { k: "deposit", icon: "💰", label: "ডিপোজিট" },
+  { k: "shop", icon: "🛍", label: "পণ্য" },
+  { k: "recharge", icon: "📶", label: "রিচার্জ" },
+  { k: "history", icon: "🧾", label: "আমার পণ্য" },
+  { k: "ledger", icon: "📒", label: "লেনদেন" },
+  { k: "pin", icon: "🔐", label: "পিন" }
 ];
 
 const card = "bg-white border border-border rounded-2xl p-4 mb-3";
 const btn = "press bg-teal text-white font-bold text-sm px-4 py-2.5 rounded-xl disabled:opacity-60";
 const btnGhost = "press bg-teal-tint text-teal-dark font-bold text-sm px-4 py-2.5 rounded-xl disabled:opacity-60";
+
+const TYPE_BN: Record<string, string> = {
+  Deposit: "ডিপোজিট",
+  Purchase: "পণ্য কেনা",
+  "Recharge hold": "রিচার্জ (টাকা আটকানো)",
+  Refund: "ফেরত",
+  "Admin payment": "অ্যাডমিন পেমেন্ট"
+};
 
 function StatusPill({ s }: { s: string }) {
   const color =
@@ -44,13 +66,93 @@ function StatusPill({ s }: { s: string }) {
   return <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${color}`}>{s}</span>;
 }
 
+/** নিচ থেকে ওঠা শিট: পিন চায় */
+function PinSheet({
+  title,
+  lines,
+  label,
+  onSubmit,
+  onClose
+}: {
+  title: string;
+  lines: string[];
+  label: string;
+  onSubmit: (pin: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    setErr("");
+    try {
+      await onSubmit(pin);
+      onClose();
+    } catch (e) {
+      setErr(telErr(e));
+      setPin("");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/55 flex items-end justify-center" onClick={busy ? undefined : onClose}>
+      <div className="bg-white w-full max-w-md rounded-t-3xl p-5 pb-8" onClick={(e) => e.stopPropagation()}>
+        <div className="font-extrabold text-base mb-2">{title}</div>
+        <div className="bg-teal-tint rounded-xl p-3 text-xs text-ink mb-3 space-y-1">
+          {lines.map((l, i) => (
+            <div key={i}>{l}</div>
+          ))}
+        </div>
+        <label className="text-xs font-bold text-mute mb-1 block">আপনার পিন দিন</label>
+        <input
+          className="input text-center tracking-[0.5em] text-lg"
+          type="password"
+          inputMode="numeric"
+          autoFocus
+          maxLength={6}
+          placeholder="••••"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => e.key === "Enter" && pin.length >= 4 && !busy && go()}
+        />
+        {err && <div className="text-xs font-bold text-red-600 mt-2">{err}</div>}
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <button className={btnGhost} disabled={busy} onClick={onClose}>
+            বাতিল
+          </button>
+          <button className={btn} disabled={busy || pin.length < 4} onClick={go}>
+            {busy ? "অপেক্ষা করুন…" : label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopyRow({ label, value, onDone }: { label: string; value: string; onDone: (ok: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-2 bg-teal-tint rounded-xl px-3 py-2">
+      <div className="flex-1 min-w-0">
+        {label && <div className="text-[10px] font-bold text-mute">{label}</div>}
+        <div className="font-mono text-[13px] font-bold text-ink break-all select-all">{value}</div>
+      </div>
+      <button className="press shrink-0 bg-white rounded-lg p-2 text-teal-dark border border-border" aria-label="কপি" onClick={async () => onDone(await copyText(value))}>
+        <Copy size={14} />
+      </button>
+    </div>
+  );
+}
+
 export default function TelecomReseller() {
   const { showToast } = useToast();
   const [ready, setReady] = useState(false);
   const [logged, setLogged] = useState(false);
   const [me, setMe] = useState<TelReseller | null>(null);
-  const [tab, setTab] = useState<Tab>("w");
+  const [view, setView] = useState<View>("home");
   const [bal, setBal] = useState<Record<Cur, number>>({ BDT: 0, SAR: 0 });
+  const [hide, setHide] = useState(false);
   const [deps, setDeps] = useState<TelDeposit[]>([]);
   const [products, setProducts] = useState<TelProduct[]>([]);
   const [packs, setPacks] = useState<TelPack[]>([]);
@@ -58,22 +160,33 @@ export default function TelecomReseller() {
   const [recharges, setRecharges] = useState<TelRecharge[]>([]);
   const [ledger, setLedger] = useState<TelLedger[]>([]);
   const [settings, setSettings] = useState<TelSettings | null>(null);
+  const [pays, setPays] = useState<TelPayMethod[]>([]);
+  const [pinSet, setPinSet] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [pinAsk, setPinAsk] = useState<{ title: string; lines: string[]; label: string; run: (pin: string) => Promise<void> } | null>(null);
 
   // আবেদন ফর্ম
   const [aName, setAName] = useState("");
   const [aCountry, setACountry] = useState("");
   const [aMobile, setAMobile] = useState("");
-  // ডিপজিট ফর্ম
-  const [dMethod, setDMethod] = useState("bKash");
+  // ডিপজিট
+  const [dMethod, setDMethod] = useState("");
   const [dCur, setDCur] = useState<Cur>("BDT");
   const [dAmount, setDAmount] = useState("");
   const [dTrx, setDTrx] = useState("");
-  // রিচার্জ ফর্ম
-  const [rOp, setROp] = useState(OPERATORS[0]);
+  // রিচার্জ
   const [rNum, setRNum] = useState("");
-  const [rPack, setRPack] = useState("");
+  const [rOp, setROp] = useState<string>(OPERATORS[0]);
+  const [rOpManual, setROpManual] = useState(false);
   const [rCur, setRCur] = useState<Cur>("BDT");
+  const [rCat, setRCat] = useState("all");
+  const [rDays, setRDays] = useState<number | "all">("all");
+  const [rSort, setRSort] = useState<"none" | "asc" | "desc">("none");
+  // পিন
+  const [pOld, setPOld] = useState("");
+  const [pNew, setPNew] = useState("");
+  const [pNew2, setPNew2] = useState("");
 
   const load = useCallback(async () => {
     const {
@@ -88,7 +201,7 @@ export default function TelecomReseller() {
     const { data: r } = await supabase.from("telecom_resellers").select("*").eq("user_id", session.user.id).maybeSingle();
     setMe((r as TelReseller) ?? null);
     if (r && (r as TelReseller).status === "Approved") {
-      const [w, d, p, k, o, rc, l, s] = await Promise.all([
+      const [w, d, p, k, o, rc, l, s, pm, ps] = await Promise.all([
         supabase.from("telecom_wallets").select("currency,balance"),
         supabase.from("telecom_deposits").select("*").order("id", { ascending: false }).limit(50),
         supabase.from("telecom_products").select("*").eq("is_active", true).order("sort_order").order("id"),
@@ -96,7 +209,9 @@ export default function TelecomReseller() {
         supabase.from("telecom_orders").select("*").order("id", { ascending: false }).limit(50),
         supabase.from("telecom_recharges").select("*").order("id", { ascending: false }).limit(50),
         supabase.from("telecom_ledger").select("*").order("id", { ascending: false }).limit(100),
-        supabase.from("telecom_settings").select("commission_pct,flat_charge,recharge_enabled,deposit_note").eq("id", 1).maybeSingle()
+        supabase.from("telecom_settings").select("commission_pct,flat_charge,recharge_enabled,deposit_note,purchase_note").eq("id", 1).maybeSingle(),
+        supabase.from("telecom_pay_methods").select("*").eq("is_active", true).order("sort_order"),
+        supabase.rpc("telecom_pin_status")
       ]);
       const b: Record<Cur, number> = { BDT: 0, SAR: 0 };
       (w.data ?? []).forEach((x: { currency: Cur; balance: number }) => (b[x.currency] = Number(x.balance)));
@@ -108,6 +223,8 @@ export default function TelecomReseller() {
       setRecharges((rc.data ?? []) as TelRecharge[]);
       setLedger((l.data ?? []) as TelLedger[]);
       setSettings((s.data as TelSettings) ?? null);
+      setPays((pm.data ?? []) as TelPayMethod[]);
+      setPinSet(ps.error ? null : Boolean(ps.data));
     }
     setReady(true);
   }, []);
@@ -131,17 +248,144 @@ export default function TelecomReseller() {
     }
   }
 
+  const toast = (m: string, t: "success" | "error" = "success") => showToast(m, t);
+
+  // নম্বর বদলালে অপারেটর অনুমান
+  useEffect(() => {
+    if (rOpManual) return;
+    const op = detectOperator(rNum);
+    if (op) setROp(op);
+  }, [rNum, rOpManual]);
+
+  const numOk = /^01[3-9][0-9]{8}$/.test(rNum);
+  const baseOf = (p: TelPack, c: Cur) => (c === "BDT" ? p.price_bdt : p.price_sar);
+  const cost = (p: TelPack, c: Cur) => Math.round(baseOf(p, c) * (1 - Number(settings?.commission_pct ?? 0) / 100)) + Number(settings?.flat_charge ?? 0);
+
+  const opPacks = useMemo(() => packs.filter((p) => (!p.operator || p.operator === rOp) && baseOf(p, rCur) > 0), [packs, rOp, rCur]);
+  const cats = useMemo(() => Array.from(new Set(opPacks.map((p) => p.category || "Other"))), [opPacks]);
+  const catPacks = useMemo(() => opPacks.filter((p) => rCat === "all" || (p.category || "Other") === rCat), [opPacks, rCat]);
+  const dayList = useMemo(() => Array.from(new Set(catPacks.map((p) => p.validity_days).filter((x): x is number => !!x))).sort((a, b) => b - a), [catPacks]);
+  const shownPacks = useMemo(() => {
+    let list = catPacks.filter((p) => rDays === "all" || p.validity_days === rDays);
+    if (rSort !== "none") list = [...list].sort((a, b) => (rSort === "asc" ? baseOf(a, rCur) - baseOf(b, rCur) : baseOf(b, rCur) - baseOf(a, rCur)));
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catPacks, rDays, rSort, rCur]);
+
+  function orderReceipt(o: TelOrder): ReceiptData {
+    return {
+      heading: "পণ্য কেনার রসিদ",
+      title: o.product_name,
+      orderNo: `O${o.id}`,
+      date: fmtDate(o.created_at),
+      amountText: money(o.currency, o.amount),
+      rows: parseSecret(o.secret),
+      expires: o.expires_at ? fmtDay(o.expires_at) : null,
+      note: [settings?.purchase_note, o.note].filter((x) => x && String(x).trim()).join("\n\n")
+    };
+  }
+  function rechargeReceipt(o: TelRecharge): ReceiptData {
+    return {
+      heading: "রিচার্জ রসিদ",
+      title: o.pack_name,
+      orderNo: `R${o.id}`,
+      date: fmtDate(o.created_at),
+      amountText: money(o.currency, o.amount),
+      status: o.status,
+      info: [
+        { label: "অপারেটর", value: o.operator },
+        { label: "নম্বর", value: o.number },
+        ...(o.fulfil_ref ? [{ label: "রেফারেন্স", value: o.fulfil_ref }] : [])
+      ],
+      rows: [],
+      note: ""
+    };
+  }
+
+  function needPinFirst(): boolean {
+    if (pinSet === false) {
+      showToast("কেনার আগে একটি ৪–৬ সংখ্যার পিন সেট করুন", "error");
+      setView("pin");
+      return true;
+    }
+    return false;
+  }
+
+  function askBuy(p: TelProduct, c: Cur) {
+    if (needPinFirst()) return;
+    const price = c === "BDT" ? p.price_bdt : p.price_sar;
+    setPinAsk({
+      title: "কেনা নিশ্চিত করুন",
+      lines: [`পণ্য: ${p.name}`, `মূল্য: ${money(c, price)}`, `${c} ওয়ালেট থেকে কাটা হবে`],
+      label: "কিনুন",
+      run: async (pin) => {
+        const res = await telRpcPin("telecom_buy_pin", { p_product: p.id, p_currency: c, p_pin: pin });
+        await load();
+        showToast("কেনা সম্পন্ন", "success");
+        if (res.id) {
+          const { data } = await supabase.from("telecom_orders").select("*").eq("id", res.id).maybeSingle();
+          if (data) setReceipt(orderReceipt(data as TelOrder));
+        }
+      }
+    });
+  }
+
+  function askRecharge(p: TelPack) {
+    if (needPinFirst()) return;
+    const c = rCur;
+    setPinAsk({
+      title: "রিচার্জ অর্ডার নিশ্চিত করুন",
+      lines: [
+        `${rOp} · ${rNum}`,
+        `প্যাকেজ: ${p.name}${p.validity_days ? ` (${p.validity_days} দিন)` : ""}`,
+        `আপনার খরচ: ${money(c, cost(p, c))} (${c} ওয়ালেট)`,
+        "⚠ এই প্যাকেজ এই নম্বরের সিমে না-ও থাকতে পারে। না থাকলে অর্ডার ব্যর্থ হবে এবং আপনার টাকা ফেরত যাবে।"
+      ],
+      label: "অর্ডার দিন",
+      run: async (pin) => {
+        await telRpcPin("telecom_request_recharge_pin", { p_operator: rOp, p_number: rNum, p_pack: p.id, p_currency: c, p_pin: pin });
+        await load();
+        showToast("অর্ডার তৈরি। অ্যাডমিন ম্যানুয়ালি প্রক্রিয়া করবে।", "success");
+        setRNum("");
+        setROpManual(false);
+      }
+    });
+  }
+
   if (!ready) return <div className="p-8 text-center text-mute text-sm">লোড হচ্ছে…</div>;
 
   const header = (
-    <div className="bg-teal rounded-2xl p-5 text-white flex items-center gap-3 mb-3">
-      <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center">
-        <Smartphone size={22} />
+    <div className="bg-teal rounded-2xl p-5 text-white mb-3">
+      <div className="flex items-center gap-3">
+        {view !== "home" && me?.status === "Approved" ? (
+          <button className="press w-10 h-10 rounded-full bg-white/15 flex items-center justify-center" onClick={() => setView("home")} aria-label="পেছনে">
+            <ArrowLeft size={18} />
+          </button>
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
+            <Smartphone size={20} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm">J H Telecom Reseller</div>
+          <div className="text-white/80 text-xs truncate">{me ? `${me.name}${me.country ? " · " + me.country : ""}` : "রিসেলার সেবা"}</div>
+        </div>
+        {me?.status === "Approved" && (
+          <button className="press p-2 text-white/90" onClick={() => setHide(!hide)} aria-label="ব্যালেন্স দেখা/লুকানো">
+            {hide ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        )}
       </div>
-      <div>
-        <div className="font-bold text-sm">J H Telecom Reseller</div>
-        <div className="text-white/80 text-xs">{me ? `${me.name} · ${me.country || ""}` : "রিসেলার সেবা"}</div>
-      </div>
+      {me?.status === "Approved" && (
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          {(["BDT", "SAR"] as Cur[]).map((c) => (
+            <div key={c} className="bg-white/15 rounded-xl px-3 py-2.5">
+              <div className="text-[10px] font-bold text-white/70">{c} ব্যালেন্স</div>
+              <div className="text-lg font-extrabold">{hide ? "••••" : money(c, bal[c])}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -169,11 +413,7 @@ export default function TelecomReseller() {
           <input className="input mb-2" placeholder="আপনার নাম" value={aName} onChange={(e) => setAName(e.target.value)} />
           <input className="input mb-2" placeholder="দেশ (যেমন KSA)" value={aCountry} onChange={(e) => setACountry(e.target.value)} />
           <input className="input mb-3" placeholder="মোবাইল নম্বর" value={aMobile} onChange={(e) => setAMobile(e.target.value)} />
-          <button
-            className={btn + " w-full"}
-            disabled={busy}
-            onClick={() => run(() => telRpc("telecom_apply", { p_name: aName, p_country: aCountry, p_mobile: aMobile }), "আবেদন জমা হয়েছে")}
-          >
+          <button className={btn + " w-full"} disabled={busy} onClick={() => run(() => telRpc("telecom_apply", { p_name: aName, p_country: aCountry, p_mobile: aMobile }), "আবেদন জমা হয়েছে")}>
             আবেদন করুন
           </button>
         </div>
@@ -199,75 +439,123 @@ export default function TelecomReseller() {
     );
   }
 
-  const selPack = packs.find((p) => String(p.id) === rPack);
-  const baseOf = (p: TelPack, c: Cur) => (c === "BDT" ? p.price_bdt : p.price_sar);
-  const cost = (p: TelPack, c: Cur) =>
-    Math.round(baseOf(p, c) * (1 - Number(settings?.commission_pct ?? 0) / 100)) + Number(settings?.flat_charge ?? 0);
-  const allowedMethods = METHODS.filter((m) => me.perm?.[m]);
+  const activePays = pays.filter((m) => me.perm?.[m.method as "bKash"]);
+  const curMethod = activePays.find((m) => m.method === dMethod) ?? activePays[0];
+
+  // লেনদেনের বিস্তারিত (রেফ ধরে অর্ডার/রিচার্জ/ডিপজিটের তথ্য মেলানো)
+  function ledgerDetail(l: TelLedger): { text: string; order?: TelOrder; rch?: TelRecharge } {
+    const ref = l.ref || "";
+    if (/^O\d+$/.test(ref)) {
+      const o = orders.find((x) => `O${x.id}` === ref);
+      return { text: o ? `${o.product_name} · অর্ডার ${ref}` : `${l.note} · অর্ডার ${ref}`, order: o };
+    }
+    if (/^R\d+$/.test(ref)) {
+      const r = recharges.find((x) => `R${x.id}` === ref);
+      return { text: r ? `${r.operator} ${r.number} · ${r.pack_name} · ${ref}` : `${l.note} · ${ref}`, rch: r };
+    }
+    if (/^D\d+/.test(ref)) {
+      const id = Number(ref.slice(1).split("/")[0]);
+      const d = deps.find((x) => x.id === id);
+      return { text: d ? `${d.method} · TrxID ${d.trx_id}` : `${l.note} · ${ref}` };
+    }
+    return { text: [l.note, ref].filter(Boolean).join(" · ") };
+  }
 
   return (
-    <div className="px-4 pt-4 pb-6">
+    <div className="px-4 pt-4 pb-8">
       {header}
-      <div className="grid grid-cols-4 gap-1 bg-teal-tint p-1 rounded-xl mb-3">
-        {TABS.map((t) => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k)}
-            className={`press text-[11px] font-bold py-2 rounded-lg ${tab === t.k ? "bg-white text-teal-dark shadow" : "text-teal-dark/60"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
 
-      {tab === "w" && (
+      {view === "home" && (
+        <>
+          <div className="grid grid-cols-3 gap-2.5 mb-3">
+            {TILES.map((t) => (
+              <button key={t.k} onClick={() => setView(t.k)} className="press bg-white border border-border rounded-2xl py-4 flex flex-col items-center gap-1.5">
+                <span className="text-2xl">{t.icon}</span>
+                <span className="text-[12px] font-bold text-ink">{t.label}</span>
+              </button>
+            ))}
+          </div>
+          {pinSet === false && (
+            <div className="bg-orange-tint rounded-2xl p-3 text-xs mb-3 flex items-center justify-between gap-2">
+              <span>🔐 কেনার আগে একটি পিন সেট করুন।</span>
+              <button className={btn} onClick={() => setView("pin")}>
+                পিন সেট
+              </button>
+            </div>
+          )}
+          <div className={card}>
+            <div className="font-extrabold text-sm mb-2">সাম্প্রতিক লেনদেন</div>
+            {ledger.length === 0 ? (
+              <div className="text-xs text-mute">কোনো লেনদেন নেই</div>
+            ) : (
+              ledger.slice(0, 4).map((l) => (
+                <div key={l.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-xs gap-2">
+                  <span className="min-w-0">
+                    <b>{TYPE_BN[l.type] ?? l.type}</b>
+                    <br />
+                    <span className="text-mute truncate block">{ledgerDetail(l).text}</span>
+                  </span>
+                  <b className={`shrink-0 ${l.amount < 0 ? "text-red-600" : "text-teal-dark"}`}>
+                    {l.amount < 0 ? "−" : "+"}
+                    {money(l.currency, Math.abs(l.amount))}
+                  </b>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {view === "deposit" && (
         <>
           <div className={card}>
-            <div className="text-xs font-bold text-mute mb-2">ওয়ালেট (দুই কারেন্সির ব্যালেন্স আলাদা)</div>
-            <div className="grid grid-cols-2 gap-2">
-              {(["BDT", "SAR"] as Cur[]).map((c) => (
-                <div key={c} className="bg-teal-tint rounded-xl p-3">
-                  <div className="text-[11px] text-mute font-bold">{c}</div>
-                  <div className="text-lg font-extrabold text-teal-dark">{money(c, bal[c])}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={card}>
-            <div className="font-extrabold text-sm mb-2">ডিপজিট অনুরোধ</div>
-            {settings?.deposit_note && (
-              <div className="text-[11px] bg-orange-tint text-ink rounded-lg p-2.5 mb-3 whitespace-pre-line">{settings.deposit_note}</div>
-            )}
-            {allowedMethods.length === 0 ? (
-              <div className="text-xs text-mute">আপনার জন্য কোনো পেমেন্ট মাধ্যম চালু নেই।</div>
+            <div className="font-extrabold text-sm mb-3">ডিপোজিট (ওয়ালেটে টাকা যোগ)</div>
+            {activePays.length === 0 ? (
+              <div className="text-xs text-mute">আপনার জন্য কোনো পেমেন্ট মাধ্যম চালু নেই। অ্যাডমিনের সাথে যোগাযোগ করুন।</div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-2">
-                  <select className="input" value={dMethod} onChange={(e) => setDMethod(e.target.value)}>
-                    {allowedMethods.map((m) => (
-                      <option key={m}>{m}</option>
-                    ))}
-                  </select>
-                  <select className="input" value={dCur} onChange={(e) => setDCur(e.target.value as Cur)}>
-                    <option>BDT</option>
-                    <option>SAR</option>
-                  </select>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {activePays.map((m) => {
+                    const on = curMethod?.method === m.method;
+                    const col = METHOD_COLOR[m.method] ?? "#2F7D6D";
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setDMethod(m.method)}
+                        className="press rounded-xl py-2.5 text-[13px] font-extrabold border-2"
+                        style={on ? { background: col, color: "#fff", borderColor: col } : { color: col, borderColor: col + "55", background: "transparent" }}
+                      >
+                        {m.method}
+                      </button>
+                    );
+                  })}
                 </div>
-                <input className="input mt-2" type="number" placeholder="পরিমাণ (যেমন 2000)" value={dAmount} onChange={(e) => setDAmount(e.target.value)} />
-                <input className="input mt-2 mb-3" placeholder="ট্রানজেকশন ID" value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
+                {curMethod && (
+                  <div className="rounded-xl p-3 mb-3" style={{ background: (METHOD_COLOR[curMethod.method] ?? "#2F7D6D") + "18" }}>
+                    {curMethod.number ? (
+                      <CopyRow label={`${curMethod.method} নম্বর${curMethod.kind ? " (" + curMethod.kind + ")" : ""}`} value={curMethod.number} onDone={(ok) => toast(ok ? "নম্বর কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error")} />
+                    ) : (
+                      <div className="text-xs text-mute">এই মাধ্যমের নম্বর এখনো দেওয়া হয়নি।</div>
+                    )}
+                    {curMethod.instructions && <div className="text-[11px] text-ink mt-2 whitespace-pre-line">{curMethod.instructions}</div>}
+                  </div>
+                )}
+                {settings?.deposit_note && <div className="text-[11px] bg-orange-tint text-ink rounded-lg p-2.5 mb-3 whitespace-pre-line">{settings.deposit_note}</div>}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  {(["BDT", "SAR"] as Cur[]).map((c) => (
+                    <button key={c} onClick={() => setDCur(c)} className={`press rounded-xl py-2 text-sm font-bold ${dCur === c ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+                <input className="input mb-2" type="number" inputMode="decimal" placeholder="পরিমাণ (যেমন 2000)" value={dAmount} onChange={(e) => setDAmount(e.target.value)} />
+                <input className="input mb-3" placeholder="ট্রানজেকশন ID" value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
                 <button
                   className={btn + " w-full"}
-                  disabled={busy}
+                  disabled={busy || !curMethod}
                   onClick={async () => {
                     const ok = await run(
-                      () =>
-                        telRpc("telecom_request_deposit", {
-                          p_method: allowedMethods.includes(dMethod as (typeof METHODS)[number]) ? dMethod : allowedMethods[0],
-                          p_currency: dCur,
-                          p_amount: toMinor(dAmount),
-                          p_trx: dTrx
-                        }),
+                      () => telRpc("telecom_request_deposit", { p_method: curMethod!.method, p_currency: dCur, p_amount: toMinor(dAmount), p_trx: dTrx }),
                       "অনুরোধ জমা হয়েছে। অ্যাডমিন যাচাই করলে ব্যালেন্স বাড়বে।"
                     );
                     if (ok) {
@@ -281,18 +569,19 @@ export default function TelecomReseller() {
               </>
             )}
           </div>
-
           <div className={card}>
-            <div className="font-extrabold text-sm mb-2">আমার ডিপজিট</div>
+            <div className="font-extrabold text-sm mb-2">আমার ডিপোজিট</div>
             {deps.length === 0 ? (
-              <div className="text-xs text-mute">কোনো ডিপজিট নেই</div>
+              <div className="text-xs text-mute">কোনো ডিপোজিট নেই</div>
             ) : (
               deps.map((d) => (
                 <div key={d.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-xs">
                   <span>
                     #{d.id} · {d.method} · {money(d.currency, d.amount)}
                     <br />
-                    <span className="text-mute">{d.trx_id}</span>
+                    <span className="text-mute">
+                      {d.trx_id} · {fmtDate(d.created_at)}
+                    </span>
                   </span>
                   <StatusPill s={d.status} />
                 </div>
@@ -302,37 +591,32 @@ export default function TelecomReseller() {
         </>
       )}
 
-      {tab === "s" && (
+      {view === "shop" && (
         <>
           {products.length === 0 && <div className="text-xs text-mute text-center py-6">এখন কোনো পণ্য নেই</div>}
           {products.map((p) => (
             <div key={p.id} className={card}>
-              <div className="font-extrabold text-sm mb-1">
-                {p.icon} {p.name}
+              <div className="flex gap-3">
+                {p.image_url ? (
+                  <img src={p.image_url} alt={p.name} loading="lazy" className="w-16 h-16 rounded-xl object-cover border border-border shrink-0" />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-teal-tint flex items-center justify-center text-3xl shrink-0">{p.icon}</div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-extrabold text-sm leading-snug">{p.name}</div>
+                  {p.validity_days ? <div className="text-[11px] text-mute mt-0.5">মেয়াদ {p.validity_days} দিন</div> : null}
+                  {p.description ? <div className="text-[11px] text-mute mt-1 whitespace-pre-line">{p.description}</div> : null}
+                </div>
               </div>
-              <div className="text-[11px] text-mute mb-3">🔒 কোড/পাসওয়ার্ড কেনার পর ইতিহাসে দেখা যাবে</div>
+              <div className="text-[11px] text-mute my-3">🔒 কোড/পাসওয়ার্ড কেনার পর রসিদে ও "আমার পণ্য" এ দেখা যাবে</div>
               <div className="flex gap-2">
                 {p.price_bdt > 0 && (
-                  <button
-                    className={btn + " flex-1"}
-                    disabled={busy}
-                    onClick={() =>
-                      window.confirm(`${p.name} — ${money("BDT", p.price_bdt)} BDT ওয়ালেট থেকে কাটা হবে। কিনবেন?`) &&
-                      run(() => telRpc("telecom_buy", { p_product: p.id, p_currency: "BDT" }), "কেনা সম্পন্ন। ইতিহাসে দেখুন।")
-                    }
-                  >
+                  <button className={btn + " flex-1"} disabled={busy} onClick={() => askBuy(p, "BDT")}>
                     {money("BDT", p.price_bdt)} এ কিনুন
                   </button>
                 )}
                 {p.price_sar > 0 && (
-                  <button
-                    className={btnGhost + " flex-1"}
-                    disabled={busy}
-                    onClick={() =>
-                      window.confirm(`${p.name} — ${money("SAR", p.price_sar)} SAR ওয়ালেট থেকে কাটা হবে। কিনবেন?`) &&
-                      run(() => telRpc("telecom_buy", { p_product: p.id, p_currency: "SAR" }), "কেনা সম্পন্ন। ইতিহাসে দেখুন।")
-                    }
-                  >
+                  <button className={btnGhost + " flex-1"} disabled={busy} onClick={() => askBuy(p, "SAR")}>
                     {money("SAR", p.price_sar)} এ কিনুন
                   </button>
                 )}
@@ -342,58 +626,115 @@ export default function TelecomReseller() {
         </>
       )}
 
-      {tab === "c" && (
+      {view === "recharge" && (
         <>
-          <div className={card}>
-            <div className="font-extrabold text-sm mb-2">বাংলাদেশ রিচার্জ (ম্যানুয়াল)</div>
-            {!settings?.recharge_enabled || !me.perm?.Bangladesh ? (
-              <div className="text-xs text-mute">বাংলাদেশ রিচার্জ এখন বন্ধ আছে।</div>
-            ) : (
-              <>
-                <select className="input mb-2" value={rOp} onChange={(e) => setROp(e.target.value)}>
-                  {OPERATORS.map((o) => (
-                    <option key={o}>{o}</option>
-                  ))}
-                </select>
+          {!settings?.recharge_enabled || !me.perm?.Bangladesh ? (
+            <div className={card + " text-xs text-mute"}>বাংলাদেশ রিচার্জ এখন বন্ধ আছে।</div>
+          ) : (
+            <>
+              <div className={card}>
+                <div className="font-extrabold text-sm mb-2">বাংলাদেশ রিচার্জ (ম্যানুয়াল)</div>
                 <input
-                  className="input mb-2"
+                  className="input mb-2 text-lg tracking-wide"
                   inputMode="numeric"
                   maxLength={11}
-                  placeholder="মোবাইল নম্বর 01XXXXXXXXX"
+                  placeholder="প্রথমে মোবাইল নম্বর দিন 01XXXXXXXXX"
                   value={rNum}
-                  onChange={(e) => setRNum(e.target.value.replace(/\D/g, ""))}
-                />
-                <select className="input mb-2" value={rPack} onChange={(e) => setRPack(e.target.value)}>
-                  <option value="">প্যাকেজ বেছে নিন</option>
-                  {packs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <select className="input mb-2" value={rCur} onChange={(e) => setRCur(e.target.value as Cur)}>
-                  <option>BDT</option>
-                  <option>SAR</option>
-                </select>
-                {selPack && baseOf(selPack, rCur) > 0 && (
-                  <div className="text-xs text-mute mb-3">আপনার খরচ: <b className="text-ink">{money(rCur, cost(selPack, rCur))}</b></div>
-                )}
-                <button
-                  className={btn + " w-full"}
-                  disabled={busy || !selPack}
-                  onClick={async () => {
-                    const ok = await run(
-                      () => telRpc("telecom_request_recharge", { p_operator: rOp, p_number: rNum, p_pack: Number(rPack), p_currency: rCur }),
-                      "অর্ডার তৈরি। অ্যাডমিন ম্যানুয়ালি প্রক্রিয়া করবে।"
-                    );
-                    if (ok) setRNum("");
+                  onChange={(e) => {
+                    setRNum(e.target.value.replace(/\D/g, ""));
+                    setRCat("all");
+                    setRDays("all");
                   }}
-                >
-                  অর্ডার দিন
-                </button>
-              </>
-            )}
-          </div>
+                />
+                <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2">
+                  {OPERATORS.map((o) => (
+                    <button
+                      key={o}
+                      onClick={() => {
+                        setROp(o);
+                        setROpManual(true);
+                        setRCat("all");
+                        setRDays("all");
+                      }}
+                      className={`press shrink-0 px-3 py-1.5 rounded-full text-xs font-bold ${rOp === o ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["BDT", "SAR"] as Cur[]).map((c) => (
+                    <button key={c} onClick={() => setRCur(c)} className={`press rounded-xl py-1.5 text-xs font-bold ${rCur === c ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}>
+                      {c} ওয়ালেট থেকে
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {!numOk ? (
+                <div className="text-xs text-mute text-center py-4">সঠিক ১১ সংখ্যার নম্বর দিলে প্যাকেজ দেখাবে।</div>
+              ) : (
+                <>
+                  <div className="bg-orange-tint rounded-xl p-2.5 text-[11px] text-ink mb-3">
+                    ⚠ কোনো প্যাকেজ এই নম্বরের সিমে না-ও থাকতে পারে। না থাকলে অর্ডার ব্যর্থ হবে ও টাকা ফেরত যাবে।
+                  </div>
+                  {cats.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {[{ k: "all", label: "সব", icon: "🔥" }, ...cats.map((c) => PACK_CATEGORIES.find((x) => x.k === c) ?? { k: c, label: c, icon: "📦" })].map((c) => (
+                        <button
+                          key={c.k}
+                          onClick={() => {
+                            setRCat(c.k);
+                            setRDays("all");
+                          }}
+                          className={`press rounded-2xl py-2.5 flex flex-col items-center gap-1 border ${rCat === c.k ? "bg-ink text-white border-ink" : "bg-white border-border text-ink"}`}
+                        >
+                          <span className="text-xl">{c.icon}</span>
+                          <span className="text-[11px] font-bold">{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      className="press shrink-0 flex items-center gap-1 border border-border rounded-full px-3 py-1.5 text-xs font-bold"
+                      onClick={() => setRSort(rSort === "none" ? "asc" : rSort === "asc" ? "desc" : "none")}
+                    >
+                      <ArrowUpDown size={13} /> দাম {rSort === "asc" ? "↑" : rSort === "desc" ? "↓" : ""}
+                    </button>
+                    <div className="flex gap-1.5 overflow-x-auto">
+                      {(["all", ...dayList] as (number | "all")[]).map((d) => (
+                        <button
+                          key={String(d)}
+                          onClick={() => setRDays(d)}
+                          className={`press shrink-0 px-3 py-1.5 rounded-full text-xs font-bold ${rDays === d ? "bg-green-600 text-white" : "bg-teal-tint text-teal-dark"}`}
+                        >
+                          {d === "all" ? "সব" : `${d} Days`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {shownPacks.length === 0 && <div className="text-xs text-mute text-center py-6">এই অপারেটরের জন্য প্যাকেজ নেই</div>}
+                  {shownPacks.map((p) => (
+                    <button key={p.id} onClick={() => askRecharge(p)} disabled={busy} className="press w-full text-left bg-white border border-border rounded-2xl p-3.5 mb-2.5 disabled:opacity-60">
+                      <div className="flex items-center justify-between gap-2">
+                        {p.tag ? <span className="text-[11px] font-bold bg-teal-tint text-teal-dark rounded-full px-2.5 py-1">{p.tag}</span> : <span />}
+                        {p.validity_days ? <span className="text-[11px] font-bold text-mute">🗓 {p.validity_days} DAYS</span> : null}
+                      </div>
+                      <div className="flex items-end justify-between mt-2 gap-2">
+                        <div className="font-extrabold text-base leading-snug">{p.name}</div>
+                        <div className="text-right shrink-0">
+                          <div className="font-extrabold text-base">{money(rCur, baseOf(p, rCur))}</div>
+                          <div className="text-[10px] text-mute">আপনার খরচ {money(rCur, cost(p, rCur))}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+
           <div className={card}>
             <div className="font-extrabold text-sm mb-2">রিচার্জ অর্ডার</div>
             {recharges.length === 0 ? (
@@ -401,18 +742,21 @@ export default function TelecomReseller() {
             ) : (
               recharges.map((o) => (
                 <div key={o.id} className="py-2 border-b border-border last:border-0 text-xs">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span>
                       R{o.id} · {o.operator} {o.number}
                       <br />
                       <span className="text-mute">
-                        {o.pack_name} · {money(o.currency, o.amount)}
+                        {o.pack_name} · {money(o.currency, o.amount)} · {fmtDate(o.created_at)}
                       </span>
                     </span>
                     <StatusPill s={o.status} />
                   </div>
                   {o.fulfil_ref && <div className="text-mute mt-1">রেফ: {o.fulfil_ref}</div>}
                   {o.refunded && <div className="text-mute mt-1">টাকা ফেরত হয়েছে</div>}
+                  <button className="press text-teal-dark font-bold mt-1.5" onClick={() => setReceipt(rechargeReceipt(o))}>
+                    রসিদ দেখুন / শেয়ার
+                  </button>
                 </div>
               ))
             )}
@@ -420,58 +764,133 @@ export default function TelecomReseller() {
         </>
       )}
 
-      {tab === "h" && (
+      {view === "history" && (
         <>
-          <div className={card}>
-            <div className="font-extrabold text-sm mb-2">আমার কেনা পণ্য</div>
-            {orders.length === 0 ? (
-              <div className="text-xs text-mute">নেই</div>
-            ) : (
-              orders.map((o) => (
-                <div key={o.id} className="mb-3 text-xs">
-                  <b>
-                    O{o.id} · {o.product_name}
-                  </b>{" "}
-                  <span className="text-mute">{money(o.currency, o.amount)}</span>
-                  <div className="mt-1 bg-teal-tint rounded-lg px-2.5 py-2 font-mono break-all select-all">{o.secret}</div>
+          {settings?.purchase_note && settings.purchase_note.trim() && (
+            <div className="bg-orange-tint rounded-2xl p-3.5 text-xs text-ink mb-3 whitespace-pre-line">📌 {settings.purchase_note}</div>
+          )}
+          {orders.length === 0 && <div className="text-xs text-mute text-center py-6">এখনো কোনো পণ্য কেনেননি</div>}
+          {orders.map((o) => {
+            const rows = parseSecret(o.secret);
+            return (
+              <div key={o.id} className={card}>
+                <div className="flex items-start gap-3">
+                  {o.image_url ? (
+                    <img src={o.image_url} alt="" loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-border shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-teal-tint flex items-center justify-center text-xl shrink-0">🛍</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-extrabold text-sm leading-snug">{o.product_name}</div>
+                    <div className="text-[11px] text-mute">
+                      O{o.id} · {fmtDate(o.created_at)}
+                    </div>
+                  </div>
+                  <div className="font-extrabold text-sm shrink-0">{money(o.currency, o.amount)}</div>
                 </div>
-              ))
-            )}
-          </div>
-          <div className={card}>
-            <div className="font-extrabold text-sm mb-2">ওয়ালেট লেনদেন</div>
-            {ledger.length === 0 ? (
-              <div className="text-xs text-mute">কোনো লেনদেন নেই</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[11px]">
-                  <thead>
-                    <tr className="text-left text-mute">
-                      <th className="py-1 pr-2">সময়</th>
-                      <th className="pr-2">ধরন</th>
-                      <th className="pr-2">পরিমাণ</th>
-                      <th>ব্যালেন্স</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledger.map((l) => (
-                      <tr key={l.id} className="border-t border-border whitespace-nowrap">
-                        <td className="py-1 pr-2">{fmtDate(l.created_at)}</td>
-                        <td className="pr-2">{l.type}</td>
-                        <td className={`pr-2 font-bold ${l.amount < 0 ? "text-red-600" : "text-teal-dark"}`}>
-                          {l.amount < 0 ? "−" : "+"}
-                          {money(l.currency, Math.abs(l.amount))}
-                        </td>
-                        <td>{money(l.currency, l.balance_after)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {o.note && o.note.trim() && <div className="mt-3 text-[11px] bg-orange-tint rounded-xl p-2.5 text-ink whitespace-pre-line">📌 {o.note}</div>}
+                <div className="mt-3 space-y-2">
+                  {rows.map((r, i) => (
+                    <CopyRow key={i} label={r.label} value={r.value} onDone={(ok) => toast(ok ? "কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error")} />
+                  ))}
+                </div>
+                {o.expires_at && (
+                  <div className={`mt-2 text-[11px] font-bold ${isExpired(o.expires_at) ? "text-red-600" : "text-orange"}`}>
+                    মেয়াদ শেষ: {fmtDay(o.expires_at)} {isExpired(o.expires_at) ? "(শেষ হয়ে গেছে)" : ""}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button
+                    className={btnGhost}
+                    onClick={async () => {
+                      const ok = await copyText(secretToText(rows));
+                      toast(ok ? "সব তথ্য কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error");
+                    }}
+                  >
+                    সব কপি
+                  </button>
+                  <button className={btn} onClick={() => setReceipt(orderReceipt(o))}>
+                    রসিদ / শেয়ার
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })}
         </>
       )}
+
+      {view === "ledger" && (
+        <div className={card}>
+          <div className="font-extrabold text-sm mb-2">ওয়ালেট লেনদেন</div>
+          {ledger.length === 0 ? (
+            <div className="text-xs text-mute">কোনো লেনদেন নেই</div>
+          ) : (
+            ledger.map((l) => {
+              const d = ledgerDetail(l);
+              return (
+                <div key={l.id} className="py-2.5 border-b border-border last:border-0 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-[13px]">{TYPE_BN[l.type] ?? l.type}</div>
+                      <div className="text-mute break-words">{d.text}</div>
+                      <div className="text-mute text-[10px] mt-0.5">{fmtDate(l.created_at)}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className={`font-extrabold text-[13px] ${l.amount < 0 ? "text-red-600" : "text-teal-dark"}`}>
+                        {l.amount < 0 ? "−" : "+"}
+                        {money(l.currency, Math.abs(l.amount))}
+                      </div>
+                      <div className="text-mute text-[10px]">ব্যালেন্স {money(l.currency, l.balance_after)}</div>
+                    </div>
+                  </div>
+                  {d.order && (
+                    <button className="press text-teal-dark font-bold mt-1" onClick={() => setReceipt(orderReceipt(d.order!))}>
+                      রসিদ দেখুন
+                    </button>
+                  )}
+                  {d.rch && (
+                    <button className="press text-teal-dark font-bold mt-1" onClick={() => setReceipt(rechargeReceipt(d.rch!))}>
+                      রসিদ দেখুন
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {view === "pin" && (
+        <div className={card}>
+          <div className="font-extrabold text-sm mb-1">{pinSet ? "পিন বদলান" : "পিন সেট করুন"}</div>
+          <div className="text-[11px] text-mute mb-3">পণ্য কেনা ও রিচার্জ অর্ডারের সময় এই পিন চাওয়া হবে। ৪ থেকে ৬ সংখ্যা। ভুলে গেলে অ্যাডমিন রিসেট করে দেবে।</div>
+          {pinSet && <input className="input mb-2" type="password" inputMode="numeric" maxLength={6} placeholder="বর্তমান পিন" value={pOld} onChange={(e) => setPOld(e.target.value.replace(/\D/g, ""))} />}
+          <input className="input mb-2" type="password" inputMode="numeric" maxLength={6} placeholder="নতুন পিন" value={pNew} onChange={(e) => setPNew(e.target.value.replace(/\D/g, ""))} />
+          <input className="input mb-3" type="password" inputMode="numeric" maxLength={6} placeholder="নতুন পিন আবার" value={pNew2} onChange={(e) => setPNew2(e.target.value.replace(/\D/g, ""))} />
+          <button
+            className={btn + " w-full"}
+            disabled={busy || pNew.length < 4}
+            onClick={async () => {
+              if (pNew !== pNew2) return showToast("দুইবার একই পিন দিন", "error");
+              const ok = await run(async () => {
+                const res = await telRpc<{ ok: boolean; error?: string; left?: number }>("telecom_set_pin", { p_new: pNew, p_old: pinSet ? pOld : null });
+                if (!res || res.ok === false) throw new PinError(res?.error ?? "PIN_WRONG", res?.left);
+              }, "পিন সংরক্ষিত হয়েছে");
+              if (ok) {
+                setPOld("");
+                setPNew("");
+                setPNew2("");
+                setView("home");
+              }
+            }}
+          >
+            সংরক্ষণ
+          </button>
+        </div>
+      )}
+
+      {receipt && <TelecomReceipt data={receipt} onClose={() => setReceipt(null)} onToast={toast} />}
+      {pinAsk && <PinSheet title={pinAsk.title} lines={pinAsk.lines} label={pinAsk.label} onSubmit={pinAsk.run} onClose={() => setPinAsk(null)} />}
     </div>
   );
 }

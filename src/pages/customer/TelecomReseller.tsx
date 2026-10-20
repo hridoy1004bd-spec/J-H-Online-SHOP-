@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowUpDown, Copy, Eye, EyeOff, Smartphone } from "lucide-re
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
 import TelecomReceipt, { ReceiptData } from "../../components/TelecomReceipt";
+import SaudiShop from "../../components/SaudiShop";
+import { BankAccount } from "../../services/saudiService";
 import {
   Cur,
   METHOD_COLOR,
@@ -33,15 +35,18 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type View = "home" | "deposit" | "shop" | "recharge" | "history" | "ledger" | "pin";
+type View = "home" | "deposit" | "shop" | "recharge" | "saudi" | "history" | "ledger" | "pin";
 
-const TILES: { k: View; icon: string; label: string }[] = [
-  { k: "deposit", icon: "💰", label: "ডিপোজিট" },
+const TILES: { k: View; icon: string; label: string; cat?: string }[] = [
+  { k: "deposit", icon: "💰", label: "Add Money" },
+  { k: "recharge", icon: "📱", label: "BD Topup" },
+  { k: "saudi", icon: "🇸🇦", label: "Saudi Voucher" },
   { k: "shop", icon: "🛍", label: "পণ্য" },
-  { k: "recharge", icon: "📶", label: "রিচার্জ" },
-  { k: "history", icon: "🧾", label: "আমার পণ্য" },
-  { k: "ledger", icon: "📒", label: "লেনদেন" },
-  { k: "pin", icon: "🔐", label: "পিন" }
+  { k: "shop", icon: "🎫", label: "Calling Card", cat: "call" },
+  { k: "shop", icon: "🛡️", label: "VPN Cards", cat: "vpn" },
+  { k: "history", icon: "🧾", label: "My Card" },
+  { k: "ledger", icon: "📒", label: "Ledger" },
+  { k: "pin", icon: "🔐", label: "PIN" }
 ];
 
 const card = "bg-white border border-border rounded-2xl p-4 mb-3";
@@ -160,11 +165,14 @@ export default function TelecomReseller() {
   const [recharges, setRecharges] = useState<TelRecharge[]>([]);
   const [ledger, setLedger] = useState<TelLedger[]>([]);
   const [settings, setSettings] = useState<TelSettings | null>(null);
+  const [waNum, setWaNum] = useState("");
   const [pays, setPays] = useState<TelPayMethod[]>([]);
+  const [banks, setBanks] = useState<BankAccount[]>([]);
   const [pinSet, setPinSet] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [pinAsk, setPinAsk] = useState<{ title: string; lines: string[]; label: string; run: (pin: string) => Promise<void> } | null>(null);
+  const [shopCat, setShopCat] = useState("all");
 
   // আবেদন ফর্ম
   const [aName, setAName] = useState("");
@@ -201,17 +209,18 @@ export default function TelecomReseller() {
     const { data: r } = await supabase.from("telecom_resellers").select("*").eq("user_id", session.user.id).maybeSingle();
     setMe((r as TelReseller) ?? null);
     if (r && (r as TelReseller).status === "Approved") {
-      const [w, d, p, k, o, rc, l, s, pm, ps] = await Promise.all([
-        supabase.from("telecom_wallets").select("currency,balance"),
-        supabase.from("telecom_deposits").select("*").order("id", { ascending: false }).limit(50),
+      const [w, d, p, k, o, rc, l, s, pm, ps, bk] = await Promise.all([
+        supabase.from("telecom_wallets").select("currency,balance").eq("reseller_id", (r as TelReseller).id),
+        supabase.from("telecom_deposits").select("*").eq("reseller_id", (r as TelReseller).id).order("id", { ascending: false }).limit(50),
         supabase.from("telecom_products").select("*").eq("is_active", true).order("sort_order").order("id"),
         supabase.from("telecom_recharge_packs").select("*").eq("is_active", true).order("sort_order").order("id"),
-        supabase.from("telecom_orders").select("*").order("id", { ascending: false }).limit(50),
-        supabase.from("telecom_recharges").select("*").order("id", { ascending: false }).limit(50),
-        supabase.from("telecom_ledger").select("*").order("id", { ascending: false }).limit(100),
-        supabase.from("telecom_settings").select("commission_pct,flat_charge,recharge_enabled,deposit_note,purchase_note").eq("id", 1).maybeSingle(),
+        supabase.from("telecom_orders").select("*").eq("reseller_id", (r as TelReseller).id).order("id", { ascending: false }).limit(50),
+        supabase.from("telecom_recharges").select("*").eq("reseller_id", (r as TelReseller).id).order("id", { ascending: false }).limit(50),
+        supabase.from("telecom_ledger").select("*").eq("reseller_id", (r as TelReseller).id).order("id", { ascending: false }).limit(100),
+        supabase.from("telecom_settings").select("commission_pct,flat_charge,recharge_enabled,deposit_note,purchase_note,whatsapp_number").eq("id", 1).maybeSingle(),
         supabase.from("telecom_pay_methods").select("*").eq("is_active", true).order("sort_order"),
-        supabase.rpc("telecom_pin_status")
+        supabase.rpc("telecom_pin_status"),
+        supabase.from("telecom_bank_accounts").select("*").eq("is_active", true).order("sort_order").order("id")
       ]);
       const b: Record<Cur, number> = { BDT: 0, SAR: 0 };
       (w.data ?? []).forEach((x: { currency: Cur; balance: number }) => (b[x.currency] = Number(x.balance)));
@@ -223,7 +232,9 @@ export default function TelecomReseller() {
       setRecharges((rc.data ?? []) as TelRecharge[]);
       setLedger((l.data ?? []) as TelLedger[]);
       setSettings((s.data as TelSettings) ?? null);
+      setWaNum(((s.data as { whatsapp_number?: string } | null)?.whatsapp_number) ?? "");
       setPays((pm.data ?? []) as TelPayMethod[]);
+      setBanks((bk.data ?? []) as BankAccount[]);
       setPinSet(ps.error ? null : Boolean(ps.data));
     }
     setReady(true);
@@ -271,6 +282,16 @@ export default function TelecomReseller() {
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catPacks, rDays, rSort, rCur]);
+
+  const shopCats = useMemo(() => Array.from(new Set(products.map((p) => (p.category ?? "").trim()).filter(Boolean))), [products]);
+  const shownProducts = useMemo(() => {
+    if (shopCat === "all") return products;
+    if (shopCat === "call" || shopCat === "vpn") {
+      const key = shopCat === "call" ? "call" : "vpn";
+      return products.filter((p) => `${p.category ?? ""} ${p.name}`.toLowerCase().includes(key));
+    }
+    return products.filter((p) => (p.category ?? "").trim() === shopCat);
+  }, [products, shopCat]);
 
   function orderReceipt(o: TelOrder): ReceiptData {
     return {
@@ -354,6 +375,17 @@ export default function TelecomReseller() {
 
   if (!ready) return <div className="p-8 text-center text-mute text-sm">লোড হচ্ছে…</div>;
 
+  const titleOf: Record<View, string> = {
+    home: "J H Telecom Reseller",
+    deposit: "Add Money",
+    shop: "পণ্য",
+    recharge: "BD Mobile Recharge",
+    saudi: "Saudi Voucher",
+    history: "My Card / History",
+    ledger: "Ledger",
+    pin: "PIN"
+  };
+
   const header = (
     <div className="bg-teal rounded-2xl p-5 text-white mb-3">
       <div className="flex items-center gap-3">
@@ -367,7 +399,7 @@ export default function TelecomReseller() {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-sm">J H Telecom Reseller</div>
+          <div className="font-bold text-sm">{titleOf[view]}</div>
           <div className="text-white/80 text-xs truncate">{me ? `${me.name}${me.country ? " · " + me.country : ""}` : "রিসেলার সেবা"}</div>
         </div>
         {me?.status === "Approved" && (
@@ -440,7 +472,9 @@ export default function TelecomReseller() {
   }
 
   const activePays = pays.filter((m) => me.perm?.[m.method as "bKash"]);
-  const curMethod = activePays.find((m) => m.method === dMethod) ?? activePays[0];
+  const hasBank = banks.length > 0;
+  const curMethod = dMethod === "Bank" ? undefined : activePays.find((m) => m.method === dMethod) ?? (dMethod === "" ? activePays[0] : undefined);
+  const bankMode = dMethod === "Bank" || (activePays.length === 0 && hasBank);
 
   // লেনদেনের বিস্তারিত (রেফ ধরে অর্ডার/রিচার্জ/ডিপজিটের তথ্য মেলানো)
   function ledgerDetail(l: TelLedger): { text: string; order?: TelOrder; rch?: TelRecharge } {
@@ -452,6 +486,9 @@ export default function TelecomReseller() {
     if (/^R\d+$/.test(ref)) {
       const r = recharges.find((x) => `R${x.id}` === ref);
       return { text: r ? `${r.operator} ${r.number} · ${r.pack_name} · ${ref}` : `${l.note} · ${ref}`, rch: r };
+    }
+    if (/^S\d+$/.test(ref)) {
+      return { text: `সৌদি অর্ডার ${ref} · ${l.note}` };
     }
     if (/^D\d+/.test(ref)) {
       const id = Number(ref.slice(1).split("/")[0]);
@@ -467,11 +504,19 @@ export default function TelecomReseller() {
 
       {view === "home" && (
         <>
-          <div className="grid grid-cols-3 gap-2.5 mb-3">
+          <div className="bg-teal-tint text-teal-dark rounded-full px-4 py-2.5 text-[12px] font-semibold mb-4 truncate">📢 {settings?.deposit_note?.trim() ? settings.deposit_note.split("\n")[0] : "J H Telecom: ডিপোজিট, রিচার্জ, সৌদি ভাউচার ও কার্ড এক জায়গায়"}</div>
+          <div className="grid grid-cols-4 gap-x-2 gap-y-4 mb-4">
             {TILES.map((t) => (
-              <button key={t.k} onClick={() => setView(t.k)} className="press bg-white border border-border rounded-2xl py-4 flex flex-col items-center gap-1.5">
-                <span className="text-2xl">{t.icon}</span>
-                <span className="text-[12px] font-bold text-ink">{t.label}</span>
+              <button
+                key={t.label}
+                onClick={() => {
+                  if (t.k === "shop") setShopCat(t.cat ?? "all");
+                  setView(t.k);
+                }}
+                className="press flex flex-col items-center gap-1.5"
+              >
+                <span className="w-14 h-14 rounded-2xl bg-teal-tint flex items-center justify-center text-2xl">{t.icon}</span>
+                <span className="text-[11px] font-semibold text-ink leading-tight text-center">{t.label}</span>
               </button>
             ))}
           </div>
@@ -483,6 +528,10 @@ export default function TelecomReseller() {
               </button>
             </div>
           )}
+          <div className="rounded-2xl p-5 text-white mb-3 bg-gradient-to-br from-[#1c2f78] to-[#3d62d6]">
+            <div className="font-extrabold text-lg">J H Telecom</div>
+            <div className="text-xs opacity-85 mt-1">বাংলাদেশের সব সিম রিচার্জ · সৌদি ভাউচার · কলিং ও VPN কার্ড</div>
+          </div>
           <div className={card}>
             <div className="font-extrabold text-sm mb-2">সাম্প্রতিক লেনদেন</div>
             {ledger.length === 0 ? (
@@ -506,17 +555,21 @@ export default function TelecomReseller() {
         </>
       )}
 
+      {view === "saudi" && (
+        <SaudiShop resellerId={me.id} bal={bal} pinSet={pinSet} whatsapp={waNum} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />
+      )}
+
       {view === "deposit" && (
         <>
           <div className={card}>
-            <div className="font-extrabold text-sm mb-3">ডিপোজিট (ওয়ালেটে টাকা যোগ)</div>
-            {activePays.length === 0 ? (
+            <div className="font-extrabold text-sm mb-3">Add Money (ওয়ালেটে টাকা যোগ)</div>
+            {activePays.length === 0 && !hasBank ? (
               <div className="text-xs text-mute">আপনার জন্য কোনো পেমেন্ট মাধ্যম চালু নেই। অ্যাডমিনের সাথে যোগাযোগ করুন।</div>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="grid grid-cols-2 gap-2 mb-3">
                   {activePays.map((m) => {
-                    const on = curMethod?.method === m.method;
+                    const on = !bankMode && curMethod?.method === m.method;
                     const col = METHOD_COLOR[m.method] ?? "#2F7D6D";
                     return (
                       <button
@@ -529,16 +582,43 @@ export default function TelecomReseller() {
                       </button>
                     );
                   })}
+                  {hasBank && (
+                    <button
+                      onClick={() => {
+                        setDMethod("Bank");
+                        setDCur((banks[0]?.currency as Cur) === "BDT" ? "BDT" : "SAR");
+                      }}
+                      className={`press rounded-xl py-2.5 text-[13px] font-extrabold border-2 ${bankMode ? "bg-ink text-white border-ink" : "border-ink/40 text-ink"}`}
+                    >
+                      🏦 Bank
+                    </button>
+                  )}
                 </div>
-                {curMethod && (
-                  <div className="rounded-xl p-3 mb-3" style={{ background: (METHOD_COLOR[curMethod.method] ?? "#2F7D6D") + "18" }}>
-                    {curMethod.number ? (
-                      <CopyRow label={`${curMethod.method} নম্বর${curMethod.kind ? " (" + curMethod.kind + ")" : ""}`} value={curMethod.number} onDone={(ok) => toast(ok ? "নম্বর কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error")} />
-                    ) : (
-                      <div className="text-xs text-mute">এই মাধ্যমের নম্বর এখনো দেওয়া হয়নি।</div>
-                    )}
-                    {curMethod.instructions && <div className="text-[11px] text-ink mt-2 whitespace-pre-line">{curMethod.instructions}</div>}
+
+                {bankMode ? (
+                  <div className="space-y-3 mb-3">
+                    {banks.map((b) => (
+                      <div key={b.id} className="rounded-xl border border-border p-3">
+                        <div className="font-extrabold text-sm">{b.bank_name}</div>
+                        {b.account_name && <div className="text-xs text-mute mb-2">{b.account_name}</div>}
+                        <CopyRow label="IBAN" value={b.iban} onDone={(ok) => toast(ok ? "IBAN কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error")} />
+                        {b.qr_url && <img src={b.qr_url} alt="QR" className="w-44 h-44 object-contain mx-auto mt-3 rounded-lg bg-white border border-border" />}
+                        {b.instructions && <div className="text-[11px] text-ink mt-2 whitespace-pre-line">{b.instructions}</div>}
+                      </div>
+                    ))}
+                    <div className="text-[11px] text-mute">টাকা পাঠানোর পর নিচে পরিমাণ ও ট্রানজেকশন রেফারেন্স দিয়ে জমা দিন।</div>
                   </div>
+                ) : (
+                  curMethod && (
+                    <div className="rounded-xl p-3 mb-3" style={{ background: (METHOD_COLOR[curMethod.method] ?? "#2F7D6D") + "18" }}>
+                      {curMethod.number ? (
+                        <CopyRow label={`${curMethod.method} নম্বর${curMethod.kind ? " (" + curMethod.kind + ")" : ""}`} value={curMethod.number} onDone={(ok) => toast(ok ? "নম্বর কপি হয়েছে" : "কপি করা গেল না", ok ? "success" : "error")} />
+                      ) : (
+                        <div className="text-xs text-mute">এই মাধ্যমের নম্বর এখনো দেওয়া হয়নি।</div>
+                      )}
+                      {curMethod.instructions && <div className="text-[11px] text-ink mt-2 whitespace-pre-line">{curMethod.instructions}</div>}
+                    </div>
+                  )
                 )}
                 {settings?.deposit_note && <div className="text-[11px] bg-orange-tint text-ink rounded-lg p-2.5 mb-3 whitespace-pre-line">{settings.deposit_note}</div>}
                 <div className="grid grid-cols-2 gap-2 mb-2">
@@ -549,13 +629,14 @@ export default function TelecomReseller() {
                   ))}
                 </div>
                 <input className="input mb-2" type="number" inputMode="decimal" placeholder="পরিমাণ (যেমন 2000)" value={dAmount} onChange={(e) => setDAmount(e.target.value)} />
-                <input className="input mb-3" placeholder="ট্রানজেকশন ID" value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
+                <input className="input mb-3" placeholder={bankMode ? "ট্রানজেকশন রেফারেন্স / ট্রান্সফার নম্বর" : "ট্রানজেকশন ID"} value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
                 <button
                   className={btn + " w-full"}
-                  disabled={busy || !curMethod}
+                  disabled={busy || (!bankMode && !curMethod)}
                   onClick={async () => {
+                    const method = bankMode ? "Bank" : curMethod!.method;
                     const ok = await run(
-                      () => telRpc("telecom_request_deposit", { p_method: curMethod!.method, p_currency: dCur, p_amount: toMinor(dAmount), p_trx: dTrx }),
+                      () => telRpc("telecom_request_deposit", { p_method: method, p_currency: dCur, p_amount: toMinor(dAmount), p_trx: dTrx }),
                       "অনুরোধ জমা হয়েছে। অ্যাডমিন যাচাই করলে ব্যালেন্স বাড়বে।"
                     );
                     if (ok) {
@@ -593,8 +674,22 @@ export default function TelecomReseller() {
 
       {view === "shop" && (
         <>
-          {products.length === 0 && <div className="text-xs text-mute text-center py-6">এখন কোনো পণ্য নেই</div>}
-          {products.map((p) => (
+          {(shopCats.length > 0 || shopCat !== "all") && (
+            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2">
+              {[
+                { k: "all", l: "সব" },
+                { k: "call", l: "Calling Card" },
+                { k: "vpn", l: "VPN" },
+                ...shopCats.filter((c) => !/call|vpn/i.test(c)).map((c) => ({ k: c, l: c }))
+              ].map((c) => (
+                <button key={c.k} onClick={() => setShopCat(c.k)} className={`press shrink-0 px-3 py-1.5 rounded-full text-xs font-bold ${shopCat === c.k ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}>
+                  {c.l}
+                </button>
+              ))}
+            </div>
+          )}
+          {shownProducts.length === 0 && <div className="text-xs text-mute text-center py-6">এখন কোনো পণ্য নেই</div>}
+          {shownProducts.map((p) => (
             <div key={p.id} className={card}>
               <div className="flex gap-3">
                 {p.image_url ? (
@@ -608,7 +703,7 @@ export default function TelecomReseller() {
                   {p.description ? <div className="text-[11px] text-mute mt-1 whitespace-pre-line">{p.description}</div> : null}
                 </div>
               </div>
-              <div className="text-[11px] text-mute my-3">🔒 কোড/পাসওয়ার্ড কেনার পর রসিদে ও "আমার পণ্য" এ দেখা যাবে</div>
+              <div className="text-[11px] text-mute my-3">🔒 কোড/পাসওয়ার্ড কেনার পর রসিদে ও "My Card" এ দেখা যাবে</div>
               <div className="flex gap-2">
                 {p.price_bdt > 0 && (
                   <button className={btn + " flex-1"} disabled={busy} onClick={() => askBuy(p, "BDT")}>

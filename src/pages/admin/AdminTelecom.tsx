@@ -4,6 +4,8 @@ import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
 import { uploadService } from "../../services/uploadService";
 import AdminTelecomSaudi from "../../components/AdminTelecomSaudi";
+import AdminTelecomMb from "../../components/AdminTelecomMb";
+import { signedProofUrl } from "../../services/bdService";
 import {
   Cur,
   OPERATORS,
@@ -27,12 +29,13 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type Tab = "o" | "r" | "d" | "q" | "sa" | "b" | "p" | "s" | "l";
+type Tab = "o" | "r" | "d" | "q" | "mb" | "sa" | "b" | "p" | "s" | "l";
 const TABS: { k: Tab; label: string }[] = [
   { k: "o", label: "📊 ওভারভিউ" },
   { k: "r", label: "👤 রিসেলার" },
   { k: "d", label: "💰 ডিপজিট" },
   { k: "q", label: "📲 রিচার্জ" },
+  { k: "mb", label: "🏦 মোবাইল ব্যাংকিং" },
   { k: "sa", label: "🇸🇦 সৌদি" },
   { k: "b", label: "🛒 বিক্রি" },
   { k: "p", label: "🛍 পণ্য" },
@@ -65,6 +68,7 @@ function Pill({ s }: { s: string }) {
 
 type Wallet = { reseller_id: string; currency: Cur; balance: number };
 type StockRow = { product_id: number; status: string };
+type DepProof = { proof_text?: string; proof_url?: string | null };
 
 interface ProdForm {
   name: string;
@@ -298,6 +302,7 @@ export default function AdminTelecom() {
       return r ? `${r.operator} ${r.number} · ${r.pack_name} · ${ref} (${r.status})` : `${l.note} · ${ref}`;
     }
     if (/^S\d+$/.test(ref)) return `সৌদি অর্ডার ${ref} · ${l.note}`;
+    if (/^M\d+$/.test(ref)) return `মোবাইল ব্যাংকিং ${ref} · ${l.note}`;
     if (/^D\d+/.test(ref)) {
       const id = Number(ref.slice(1).split("/")[0]);
       const d = deps.find((x) => x.id === id);
@@ -322,6 +327,8 @@ export default function AdminTelecom() {
           </button>
         ))}
       </div>
+
+      {tab === "mb" && <AdminTelecomMb resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
 
       {tab === "sa" && <AdminTelecomSaudi resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
 
@@ -443,7 +450,22 @@ export default function AdminTelecom() {
               <span>
                 D{d.id} · {name(d.reseller_id)} · {d.method} · <b>{money(d.currency, d.amount)}</b>
                 <br />
-                <span className="text-mute">TrxID: {d.trx_id} · {fmtDate(d.created_at)}</span>
+                <span className="text-mute">{d.method === "Bank" ? "রেফ" : "TrxID"}: {d.trx_id} · {fmtDate(d.created_at)}</span>
+                {(d as TelDeposit & DepProof).proof_text ? (
+                  <span className="block mt-1 bg-teal-tint rounded-lg px-2 py-1.5 whitespace-pre-line break-words text-ink select-all">{(d as TelDeposit & DepProof).proof_text}</span>
+                ) : null}
+                {(d as TelDeposit & DepProof).proof_url ? (
+                  <button
+                    className="press text-teal-dark font-bold mt-1 block"
+                    onClick={async () => {
+                      const u = await signedProofUrl((d as TelDeposit & DepProof).proof_url as string);
+                      if (u) window.open(u, "_blank");
+                      else showToast("স্ক্রিনশট খোলা গেল না", "error");
+                    }}
+                  >
+                    📎 স্ক্রিনশট দেখুন
+                  </button>
+                ) : null}
               </span>
               {d.status === "Pending" ? (
                 <span className="flex gap-1 shrink-0">
@@ -470,7 +492,7 @@ export default function AdminTelecom() {
                   <span>
                     R{o.id} · {name(o.reseller_id)} · {o.operator} <b>{o.number}</b>
                     <br />
-                    <span className="text-mute">{o.pack_name} · {money(o.currency, o.amount)} · {fmtDate(o.created_at)}</span>
+                    <span className="text-mute">{o.pack_name}{(o as TelRecharge & { rtype?: string }).rtype && o.pack_name.indexOf("Top-up") < 0 ? ` · ${(o as TelRecharge & { rtype?: string }).rtype}` : ""} · {money(o.currency, o.amount)} · {fmtDate(o.created_at)}</span>
                   </span>
                   <Pill s={o.status} />
                 </div>

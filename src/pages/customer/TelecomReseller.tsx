@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowUpDown, Copy, Eye, EyeOff, Smartphone } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, Smartphone } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
 import TelecomReceipt, { ReceiptData } from "../../components/TelecomReceipt";
 import SaudiShop from "../../components/SaudiShop";
+import BdTopup from "../../components/BdTopup";
+import MobileBanking from "../../components/MobileBanking";
+import { bdErr, parseBankSms, smsKey, uploadProof } from "../../services/bdService";
 import { BankAccount } from "../../services/saudiService";
 import {
   Cur,
   METHOD_COLOR,
-  OPERATORS,
-  PACK_CATEGORIES,
   PinError,
   TelDeposit,
   TelLedger,
@@ -22,7 +23,6 @@ import {
   TelReseller,
   TelSettings,
   copyText,
-  detectOperator,
   fmtDate,
   fmtDay,
   isExpired,
@@ -35,11 +35,13 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type View = "home" | "deposit" | "shop" | "recharge" | "saudi" | "history" | "ledger" | "pin";
+type View = "home" | "deposit" | "shop" | "recharge" | "mb" | "saudi" | "history" | "ledger" | "pin";
 
-const TILES: { k: View; icon: string; label: string; cat?: string }[] = [
+const TILES: { k: View; icon: string; label: string; cat?: string; tab?: "topup" | "drive" }[] = [
   { k: "deposit", icon: "💰", label: "Add Money" },
-  { k: "recharge", icon: "📱", label: "BD Topup" },
+  { k: "recharge", icon: "📱", label: "BD Topup", tab: "topup" },
+  { k: "recharge", icon: "🌐", label: "Drive Offer", tab: "drive" },
+  { k: "mb", icon: "🏦", label: "Mobile Banking" },
   { k: "saudi", icon: "🇸🇦", label: "Saudi Voucher" },
   { k: "shop", icon: "🛍", label: "পণ্য" },
   { k: "shop", icon: "🎫", label: "Calling Card", cat: "call" },
@@ -183,14 +185,10 @@ export default function TelecomReseller() {
   const [dCur, setDCur] = useState<Cur>("BDT");
   const [dAmount, setDAmount] = useState("");
   const [dTrx, setDTrx] = useState("");
-  // রিচার্জ
-  const [rNum, setRNum] = useState("");
-  const [rOp, setROp] = useState<string>(OPERATORS[0]);
-  const [rOpManual, setROpManual] = useState(false);
-  const [rCur, setRCur] = useState<Cur>("BDT");
-  const [rCat, setRCat] = useState("all");
-  const [rDays, setRDays] = useState<number | "all">("all");
-  const [rSort, setRSort] = useState<"none" | "asc" | "desc">("none");
+  const [rTab, setRTab] = useState<"topup" | "drive">("topup");
+  // ব্যাংক ডিপজিট প্রুফ
+  const [dSms, setDSms] = useState("");
+  const [dFile, setDFile] = useState<File | null>(null);
   // পিন
   const [pOld, setPOld] = useState("");
   const [pNew, setPNew] = useState("");
@@ -252,7 +250,7 @@ export default function TelecomReseller() {
       await load();
       return true;
     } catch (e) {
-      showToast(telErr(e), "error");
+      showToast(bdErr(e), "error");
       return false;
     } finally {
       setBusy(false);
@@ -260,28 +258,6 @@ export default function TelecomReseller() {
   }
 
   const toast = (m: string, t: "success" | "error" = "success") => showToast(m, t);
-
-  // নম্বর বদলালে অপারেটর অনুমান
-  useEffect(() => {
-    if (rOpManual) return;
-    const op = detectOperator(rNum);
-    if (op) setROp(op);
-  }, [rNum, rOpManual]);
-
-  const numOk = /^01[3-9][0-9]{8}$/.test(rNum);
-  const baseOf = (p: TelPack, c: Cur) => (c === "BDT" ? p.price_bdt : p.price_sar);
-  const cost = (p: TelPack, c: Cur) => Math.round(baseOf(p, c) * (1 - Number(settings?.commission_pct ?? 0) / 100)) + Number(settings?.flat_charge ?? 0);
-
-  const opPacks = useMemo(() => packs.filter((p) => (!p.operator || p.operator === rOp) && baseOf(p, rCur) > 0), [packs, rOp, rCur]);
-  const cats = useMemo(() => Array.from(new Set(opPacks.map((p) => p.category || "Other"))), [opPacks]);
-  const catPacks = useMemo(() => opPacks.filter((p) => rCat === "all" || (p.category || "Other") === rCat), [opPacks, rCat]);
-  const dayList = useMemo(() => Array.from(new Set(catPacks.map((p) => p.validity_days).filter((x): x is number => !!x))).sort((a, b) => b - a), [catPacks]);
-  const shownPacks = useMemo(() => {
-    let list = catPacks.filter((p) => rDays === "all" || p.validity_days === rDays);
-    if (rSort !== "none") list = [...list].sort((a, b) => (rSort === "asc" ? baseOf(a, rCur) - baseOf(b, rCur) : baseOf(b, rCur) - baseOf(a, rCur)));
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catPacks, rDays, rSort, rCur]);
 
   const shopCats = useMemo(() => Array.from(new Set(products.map((p) => (p.category ?? "").trim()).filter(Boolean))), [products]);
   const shownProducts = useMemo(() => {
@@ -351,35 +327,14 @@ export default function TelecomReseller() {
     });
   }
 
-  function askRecharge(p: TelPack) {
-    if (needPinFirst()) return;
-    const c = rCur;
-    setPinAsk({
-      title: "রিচার্জ অর্ডার নিশ্চিত করুন",
-      lines: [
-        `${rOp} · ${rNum}`,
-        `প্যাকেজ: ${p.name}${p.validity_days ? ` (${p.validity_days} দিন)` : ""}`,
-        `আপনার খরচ: ${money(c, cost(p, c))} (${c} ওয়ালেট)`,
-        "⚠ এই প্যাকেজ এই নম্বরের সিমে না-ও থাকতে পারে। না থাকলে অর্ডার ব্যর্থ হবে এবং আপনার টাকা ফেরত যাবে।"
-      ],
-      label: "অর্ডার দিন",
-      run: async (pin) => {
-        await telRpcPin("telecom_request_recharge_pin", { p_operator: rOp, p_number: rNum, p_pack: p.id, p_currency: c, p_pin: pin });
-        await load();
-        showToast("অর্ডার তৈরি। অ্যাডমিন ম্যানুয়ালি প্রক্রিয়া করবে।", "success");
-        setRNum("");
-        setROpManual(false);
-      }
-    });
-  }
-
   if (!ready) return <div className="p-8 text-center text-mute text-sm">লোড হচ্ছে…</div>;
 
   const titleOf: Record<View, string> = {
     home: "J H Telecom Reseller",
     deposit: "Add Money",
     shop: "পণ্য",
-    recharge: "BD Mobile Recharge",
+    recharge: "Mobile Recharge",
+    mb: "Mobile Banking",
     saudi: "Saudi Voucher",
     history: "My Card / History",
     ledger: "Ledger",
@@ -487,6 +442,9 @@ export default function TelecomReseller() {
       const r = recharges.find((x) => `R${x.id}` === ref);
       return { text: r ? `${r.operator} ${r.number} · ${r.pack_name} · ${ref}` : `${l.note} · ${ref}`, rch: r };
     }
+    if (/^M\d+$/.test(ref)) {
+      return { text: `মোবাইল ব্যাংকিং ${ref} · ${l.note}` };
+    }
     if (/^S\d+$/.test(ref)) {
       return { text: `সৌদি অর্ডার ${ref} · ${l.note}` };
     }
@@ -511,6 +469,7 @@ export default function TelecomReseller() {
                 key={t.label}
                 onClick={() => {
                   if (t.k === "shop") setShopCat(t.cat ?? "all");
+                  if (t.k === "recharge") setRTab(t.tab ?? "topup");
                   setView(t.k);
                 }}
                 className="press flex flex-col items-center gap-1.5"
@@ -606,7 +565,7 @@ export default function TelecomReseller() {
                         {b.instructions && <div className="text-[11px] text-ink mt-2 whitespace-pre-line">{b.instructions}</div>}
                       </div>
                     ))}
-                    <div className="text-[11px] text-mute">টাকা পাঠানোর পর নিচে পরিমাণ ও ট্রানজেকশন রেফারেন্স দিয়ে জমা দিন।</div>
+                    <div className="text-[11px] text-mute">টাকা পাঠানোর পর নিচে পরিমাণ দিন এবং ব্যাংকের মেসেজ বা স্ক্রিনশট দিয়ে জমা দিন।</div>
                   </div>
                 ) : (
                   curMethod && (
@@ -629,19 +588,56 @@ export default function TelecomReseller() {
                   ))}
                 </div>
                 <input className="input mb-2" type="number" inputMode="decimal" placeholder="পরিমাণ (যেমন 2000)" value={dAmount} onChange={(e) => setDAmount(e.target.value)} />
-                <input className="input mb-3" placeholder={bankMode ? "ট্রানজেকশন রেফারেন্স / ট্রান্সফার নম্বর" : "ট্রানজেকশন ID"} value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
+                {bankMode ? (
+                  <>
+                    <label className="text-xs font-bold text-mute block mb-1">ব্যাংকের মেসেজ (SMS) পেস্ট করুন</label>
+                    <textarea
+                      className="input mb-2"
+                      rows={4}
+                      placeholder={"যেমন:\nOnline Purchase\nBy:9627;mada-Apple Pay\nFrom:3413\nAmount:SR 1000\nAt:barq\n14/10/26 18:04"}
+                      value={dSms}
+                      onChange={(e) => {
+                        setDSms(e.target.value);
+                        const g = parseBankSms(e.target.value);
+                        if (g && !dAmount) {
+                          setDAmount(g.amount);
+                          setDCur(g.cur);
+                        }
+                      }}
+                    />
+                    <label className="text-xs font-bold text-mute block mb-1">অথবা স্ক্রিনশট দিন</label>
+                    <input className="input mb-1" type="file" accept="image/*" onChange={(e) => setDFile(e.target.files?.[0] ?? null)} />
+                    {dFile && <div className="text-[11px] text-teal-dark mb-2">নির্বাচিত: {dFile.name}</div>}
+                    <div className="text-[11px] text-mute mb-3">মেসেজ অথবা স্ক্রিনশট, যেকোনো একটা দিলেই হবে। স্ক্রিনশট শুধু আপনি ও অ্যাডমিন দেখবে।</div>
+                  </>
+                ) : (
+                  <input className="input mb-3" placeholder="ট্রানজেকশন ID" value={dTrx} onChange={(e) => setDTrx(e.target.value)} />
+                )}
                 <button
                   className={btn + " w-full"}
                   disabled={busy || (!bankMode && !curMethod)}
                   onClick={async () => {
                     const method = bankMode ? "Bank" : curMethod!.method;
-                    const ok = await run(
-                      () => telRpc("telecom_request_deposit", { p_method: method, p_currency: dCur, p_amount: toMinor(dAmount), p_trx: dTrx }),
-                      "অনুরোধ জমা হয়েছে। অ্যাডমিন যাচাই করলে ব্যালেন্স বাড়বে।"
-                    );
+                    if (bankMode && dSms.trim().length < 10 && !dFile) return showToast("ব্যাংকের মেসেজ পেস্ট করুন অথবা স্ক্রিনশট দিন", "error");
+                    const ok = await run(async () => {
+                      let proofUrl: string | null = null;
+                      if (bankMode && dFile) proofUrl = await uploadProof(dFile);
+                      const trx = bankMode ? (dSms.trim().length >= 10 ? await smsKey(dSms) : "") : dTrx;
+                      await telRpc("telecom_request_deposit2", {
+                        p_method: method,
+                        p_currency: dCur,
+                        p_amount: toMinor(dAmount),
+                        p_trx: trx,
+                        p_proof_text: bankMode ? dSms.trim() : "",
+                        p_proof_url: proofUrl,
+                        p_sender: ""
+                      });
+                    }, "অনুরোধ জমা হয়েছে। অ্যাডমিন যাচাই করলে ব্যালেন্স বাড়বে।");
                     if (ok) {
                       setDAmount("");
                       setDTrx("");
+                      setDSms("");
+                      setDFile(null);
                     }
                   }}
                 >
@@ -722,142 +718,23 @@ export default function TelecomReseller() {
       )}
 
       {view === "recharge" && (
-        <>
-          {!settings?.recharge_enabled || !me.perm?.Bangladesh ? (
-            <div className={card + " text-xs text-mute"}>বাংলাদেশ রিচার্জ এখন বন্ধ আছে।</div>
-          ) : (
-            <>
-              <div className={card}>
-                <div className="font-extrabold text-sm mb-2">বাংলাদেশ রিচার্জ (ম্যানুয়াল)</div>
-                <input
-                  className="input mb-2 text-lg tracking-wide"
-                  inputMode="numeric"
-                  maxLength={11}
-                  placeholder="প্রথমে মোবাইল নম্বর দিন 01XXXXXXXXX"
-                  value={rNum}
-                  onChange={(e) => {
-                    setRNum(e.target.value.replace(/\D/g, ""));
-                    setRCat("all");
-                    setRDays("all");
-                  }}
-                />
-                <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2">
-                  {OPERATORS.map((o) => (
-                    <button
-                      key={o}
-                      onClick={() => {
-                        setROp(o);
-                        setROpManual(true);
-                        setRCat("all");
-                        setRDays("all");
-                      }}
-                      className={`press shrink-0 px-3 py-1.5 rounded-full text-xs font-bold ${rOp === o ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}
-                    >
-                      {o}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["BDT", "SAR"] as Cur[]).map((c) => (
-                    <button key={c} onClick={() => setRCur(c)} className={`press rounded-xl py-1.5 text-xs font-bold ${rCur === c ? "bg-teal text-white" : "bg-teal-tint text-teal-dark"}`}>
-                      {c} ওয়ালেট থেকে
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {!numOk ? (
-                <div className="text-xs text-mute text-center py-4">সঠিক ১১ সংখ্যার নম্বর দিলে প্যাকেজ দেখাবে।</div>
-              ) : (
-                <>
-                  <div className="bg-orange-tint rounded-xl p-2.5 text-[11px] text-ink mb-3">
-                    ⚠ কোনো প্যাকেজ এই নম্বরের সিমে না-ও থাকতে পারে। না থাকলে অর্ডার ব্যর্থ হবে ও টাকা ফেরত যাবে।
-                  </div>
-                  {cats.length > 0 && (
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                      {[{ k: "all", label: "সব", icon: "🔥" }, ...cats.map((c) => PACK_CATEGORIES.find((x) => x.k === c) ?? { k: c, label: c, icon: "📦" })].map((c) => (
-                        <button
-                          key={c.k}
-                          onClick={() => {
-                            setRCat(c.k);
-                            setRDays("all");
-                          }}
-                          className={`press rounded-2xl py-2.5 flex flex-col items-center gap-1 border ${rCat === c.k ? "bg-ink text-white border-ink" : "bg-white border-border text-ink"}`}
-                        >
-                          <span className="text-xl">{c.icon}</span>
-                          <span className="text-[11px] font-bold">{c.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mb-3">
-                    <button
-                      className="press shrink-0 flex items-center gap-1 border border-border rounded-full px-3 py-1.5 text-xs font-bold"
-                      onClick={() => setRSort(rSort === "none" ? "asc" : rSort === "asc" ? "desc" : "none")}
-                    >
-                      <ArrowUpDown size={13} /> দাম {rSort === "asc" ? "↑" : rSort === "desc" ? "↓" : ""}
-                    </button>
-                    <div className="flex gap-1.5 overflow-x-auto">
-                      {(["all", ...dayList] as (number | "all")[]).map((d) => (
-                        <button
-                          key={String(d)}
-                          onClick={() => setRDays(d)}
-                          className={`press shrink-0 px-3 py-1.5 rounded-full text-xs font-bold ${rDays === d ? "bg-green-600 text-white" : "bg-teal-tint text-teal-dark"}`}
-                        >
-                          {d === "all" ? "সব" : `${d} Days`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {shownPacks.length === 0 && <div className="text-xs text-mute text-center py-6">এই অপারেটরের জন্য প্যাকেজ নেই</div>}
-                  {shownPacks.map((p) => (
-                    <button key={p.id} onClick={() => askRecharge(p)} disabled={busy} className="press w-full text-left bg-white border border-border rounded-2xl p-3.5 mb-2.5 disabled:opacity-60">
-                      <div className="flex items-center justify-between gap-2">
-                        {p.tag ? <span className="text-[11px] font-bold bg-teal-tint text-teal-dark rounded-full px-2.5 py-1">{p.tag}</span> : <span />}
-                        {p.validity_days ? <span className="text-[11px] font-bold text-mute">🗓 {p.validity_days} DAYS</span> : null}
-                      </div>
-                      <div className="flex items-end justify-between mt-2 gap-2">
-                        <div className="font-extrabold text-base leading-snug">{p.name}</div>
-                        <div className="text-right shrink-0">
-                          <div className="font-extrabold text-base">{money(rCur, baseOf(p, rCur))}</div>
-                          <div className="text-[10px] text-mute">আপনার খরচ {money(rCur, cost(p, rCur))}</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-
-          <div className={card}>
-            <div className="font-extrabold text-sm mb-2">রিচার্জ অর্ডার</div>
-            {recharges.length === 0 ? (
-              <div className="text-xs text-mute">নেই</div>
-            ) : (
-              recharges.map((o) => (
-                <div key={o.id} className="py-2 border-b border-border last:border-0 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>
-                      R{o.id} · {o.operator} {o.number}
-                      <br />
-                      <span className="text-mute">
-                        {o.pack_name} · {money(o.currency, o.amount)} · {fmtDate(o.created_at)}
-                      </span>
-                    </span>
-                    <StatusPill s={o.status} />
-                  </div>
-                  {o.fulfil_ref && <div className="text-mute mt-1">রেফ: {o.fulfil_ref}</div>}
-                  {o.refunded && <div className="text-mute mt-1">টাকা ফেরত হয়েছে</div>}
-                  <button className="press text-teal-dark font-bold mt-1.5" onClick={() => setReceipt(rechargeReceipt(o))}>
-                    রসিদ দেখুন / শেয়ার
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </>
+        <BdTopup
+          key={rTab}
+          bal={bal.BDT}
+          settings={settings}
+          enabled={Boolean(settings?.recharge_enabled) && Boolean(me.perm?.Bangladesh)}
+          packs={packs}
+          recharges={recharges}
+          pinSet={pinSet}
+          startTab={rTab}
+          onChanged={load}
+          onToast={toast}
+          onNeedPin={() => setView("pin")}
+          onReceipt={(o) => setReceipt(rechargeReceipt(o))}
+        />
       )}
+
+      {view === "mb" && <MobileBanking bal={bal.BDT} flat={Number(settings?.flat_charge ?? 0)} pinSet={pinSet} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
 
       {view === "history" && (
         <>

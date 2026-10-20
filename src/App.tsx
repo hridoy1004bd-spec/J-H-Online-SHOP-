@@ -17,6 +17,8 @@ import FaqPage from "./pages/customer/Faq";
 import Favorites from "./pages/customer/Favorites";
 import TrackOrder from "./pages/customer/TrackOrder";
 import TelecomReseller from "./pages/customer/TelecomReseller";
+import DropshipperPanel from "./pages/customer/DropshipperPanel";
+import DropshipLink from "./pages/customer/DropshipLink";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -40,6 +42,7 @@ import AdminMenu from "./pages/admin/AdminMenu";
 import AdminFaq from "./pages/admin/AdminFaq";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminTelecom from "./pages/admin/AdminTelecom";
+import AdminDropship from "./pages/admin/AdminDropship";
 
 function ThemeSync() {
   const { pathname } = useLocation();
@@ -68,6 +71,8 @@ export default function App() {
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/track" element={<TrackOrder />} />
         <Route path="/telecom" element={<TelecomReseller />} />
+        <Route path="/dropshipper" element={<DropshipperPanel />} />
+        <Route path="/ds/:code/:pid" element={<DropshipLink />} />
       </Route>
 
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -93,6 +98,7 @@ export default function App() {
         <Route path="faq" element={<AdminFaq />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="telecom" element={<AdminTelecom />} />
+        <Route path="dropship" element={<AdminDropship />} />
       </Route>
     </Routes>
     </>

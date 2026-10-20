@@ -3,6 +3,7 @@ import { Smartphone, Upload } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
 import { uploadService } from "../../services/uploadService";
+import AdminTelecomSaudi from "../../components/AdminTelecomSaudi";
 import {
   Cur,
   OPERATORS,
@@ -26,12 +27,13 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type Tab = "o" | "r" | "d" | "q" | "b" | "p" | "s" | "l";
+type Tab = "o" | "r" | "d" | "q" | "sa" | "b" | "p" | "s" | "l";
 const TABS: { k: Tab; label: string }[] = [
   { k: "o", label: "📊 ওভারভিউ" },
   { k: "r", label: "👤 রিসেলার" },
   { k: "d", label: "💰 ডিপজিট" },
   { k: "q", label: "📲 রিচার্জ" },
+  { k: "sa", label: "🇸🇦 সৌদি" },
   { k: "b", label: "🛒 বিক্রি" },
   { k: "p", label: "🛍 পণ্য" },
   { k: "s", label: "⚙ সেটিংস" },
@@ -122,7 +124,7 @@ function ProductFormFields({
         <input className="input" placeholder="আইকন" value={v.icon} onChange={(e) => set({ ...v, icon: e.target.value })} />
         <input className="input col-span-2" type="number" placeholder="দাম ৳ (BDT)" value={v.bdt} onChange={(e) => set({ ...v, bdt: e.target.value })} />
         <input className="input col-span-2" type="number" placeholder="দাম SAR" value={v.sar} onChange={(e) => set({ ...v, sar: e.target.value })} />
-        <input className="input col-span-2" placeholder="ক্যাটাগরি (ঐচ্ছিক)" value={v.category} onChange={(e) => set({ ...v, category: e.target.value })} />
+        <input className="input col-span-2" placeholder="ক্যাটালগ (Calling Card / VPN ইত্যাদি)" value={v.category} onChange={(e) => set({ ...v, category: e.target.value })} />
         <input className="input col-span-2" type="number" placeholder="মেয়াদ (দিন, ঐচ্ছিক)" value={v.validity} onChange={(e) => set({ ...v, validity: e.target.value })} />
       </div>
       <textarea className="input mt-2" rows={2} placeholder="বিবরণ (পণ্যের নিচে দেখাবে)" value={v.description} onChange={(e) => set({ ...v, description: e.target.value })} />
@@ -295,6 +297,7 @@ export default function AdminTelecom() {
       const r = recharges.find((x) => `R${x.id}` === ref);
       return r ? `${r.operator} ${r.number} · ${r.pack_name} · ${ref} (${r.status})` : `${l.note} · ${ref}`;
     }
+    if (/^S\d+$/.test(ref)) return `সৌদি অর্ডার ${ref} · ${l.note}`;
     if (/^D\d+/.test(ref)) {
       const id = Number(ref.slice(1).split("/")[0]);
       const d = deps.find((x) => x.id === id);
@@ -319,6 +322,8 @@ export default function AdminTelecom() {
           </button>
         ))}
       </div>
+
+      {tab === "sa" && <AdminTelecomSaudi resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
 
       {tab === "o" && (
         <>
@@ -527,7 +532,7 @@ export default function AdminTelecom() {
           <div className={card}>
             <div className="font-extrabold text-sm mb-2">নতুন পণ্য</div>
             <ProductFormFields v={np} set={setNp} uploading={uploading} onUpload={(f) => uploadImg(f, (url) => setNp((x) => ({ ...x, image_url: url })))} />
-            <div className="text-[11px] text-mute my-2">যে কারেন্সির দাম ০ বা ফাঁকা, সেই কারেন্সিতে কেনা যাবে না।</div>
+            <div className="text-[11px] text-mute my-2">যে কারেন্সির দাম ০ বা ফাঁকা, সেই কারেন্সিতে কেনা যাবে না। ক্যাটালগে "Calling Card" বা "VPN" লিখলে কাস্টমারের ওই আইকনে দেখাবে।</div>
             <button
               className={btn}
               disabled={busy || uploading || !np.name.trim()}
@@ -681,7 +686,7 @@ export default function AdminTelecom() {
 
           <div className={card}>
             <div className="font-extrabold text-sm mb-1">পেমেন্ট মাধ্যম (bKash / Nagad / Rocket)</div>
-            <div className="text-[11px] text-mute mb-3">রিসেলার ডিপজিটের সময় এখানকার নম্বর দেখবে ও কপি করতে পারবে। শুধু চালু থাকাগুলো দেখাবে।</div>
+            <div className="text-[11px] text-mute mb-3">রিসেলার ডিপজিটের সময় এখানকার নম্বর দেখবে ও কপি করতে পারবে। ব্যাংক (IBAN/QR) যোগ করতে "🇸🇦 সৌদি" ট্যাবে "ব্যাংক" দেখুন।</div>
             {pays.map((m) => {
               const e = pmEdit[m.id] ?? {};
               const val = { ...m, ...e };

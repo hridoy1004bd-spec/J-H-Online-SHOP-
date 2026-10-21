@@ -1,3 +1,4 @@
+import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Upload, Plus, Trash2, Copy, Link as LinkIcon } from "lucide-react";
@@ -43,6 +44,11 @@ export default function EditProduct() {
   const [bulkColors, setBulkColors] = useState("");
   const [bulkQty, setBulkQty] = useState("10");
   const [bulkSaving, setBulkSaving] = useState(false);
+  // ছবি থেকে অপশন (রঙ/ডিজাইন) বানানোর টুল
+  const [optSel, setOptSel] = useState<Record<string, string>>({});
+  const [optSizes, setOptSizes] = useState("");
+  const [optQty, setOptQty] = useState("10");
+  const [optSaving, setOptSaving] = useState(false);
 
   const productPath = id ? `/product/${id}` : "";
 
@@ -312,6 +318,56 @@ export default function EditProduct() {
     }
   }
 
+  // গ্যালারির ছবি বেছে প্রতিটার নাম দিন → প্রতিটা ছবি একটা রঙ/ডিজাইন অপশন হয়ে যায় (ছবি + স্টক সহ)
+  async function pairName(side: "bn" | "en") {
+    const r = await autoPair(side, nameBn, nameEn);
+    if (r?.bn !== undefined) setNameBn(r.bn);
+    if (r?.en !== undefined) setNameEn(r.en);
+  }
+
+  async function createOptionsFromPhotos() {
+    if (!id) return;
+    const chosen = (product?.product_images ?? []).filter((im) => optSel[im.id] !== undefined);
+    if (chosen.length === 0) return showToast(lang === "en" ? "Select at least one photo" : "অন্তত একটি ছবি বেছে নিন", "error");
+    const sizeList = optSizes.split(",").map((x) => x.trim()).filter(Boolean);
+    const existingSizes = Array.from(new Set(variants.map((v) => v.size.trim()).filter(Boolean)));
+    const useSizes = sizeList.length ? sizeList : existingSizes;
+    const sizes: (string | null)[] = useSizes.length ? useSizes : [null];
+    const qty = Math.max(0, Number(optQty) || 0);
+    const have = new Set(variants.map((v) => `${v.size.trim().toLowerCase()}|${v.color.trim().toLowerCase()}`));
+    setOptSaving(true);
+    let added = 0;
+    try {
+      for (let i = 0; i < chosen.length; i++) {
+        const im = chosen[i];
+        const label = (optSel[im.id] || "").trim() || `Design ${i + 1}`;
+        for (const sz of sizes) {
+          if (have.has(`${(sz ?? "").toLowerCase()}|${label.toLowerCase()}`)) {
+            await supabase.from("product_variants").update({ image_url: im.url }).eq("product_id", id).eq("color", label);
+            continue;
+          }
+          const { data: v, error } = await supabase
+            .from("product_variants")
+            .insert({ product_id: id, size: sz, color: label, image_url: im.url })
+            .select()
+            .single();
+          if (error) throw error;
+          const { error: e2 } = await supabase.from("inventory").insert({ product_id: id, variant_id: v.id, quantity: qty, reserved: 0 });
+          if (e2) throw e2;
+          added++;
+        }
+      }
+      setOptSel({});
+      await reloadVariants();
+      showToast(lang === "en" ? `${added} option(s) created` : `${added}টি অপশন তৈরি হয়েছে`, "success");
+    } catch (err: any) {
+      await reloadVariants();
+      showToast(err.message || t("error"), "error");
+    } finally {
+      setOptSaving(false);
+    }
+  }
+
   async function deleteVariantRow(idx: number) {
     const row = variants[idx];
     if (row.id) {
@@ -371,10 +427,10 @@ export default function EditProduct() {
       </div>
 
       <Field label={`${t("productName")} (EN)`}>
-        <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} className="input" />
+        <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} onBlur={() => pairName("en")} className="input" />
       </Field>
       <Field label={`${t("productName")} (বাংলা)`}>
-        <input value={nameBn} onChange={(e) => setNameBn(e.target.value)} className="input" />
+        <input value={nameBn} onChange={(e) => setNameBn(e.target.value)} onBlur={() => pairName("bn")} className="input" />
       </Field>
       <Field label={t("description")}>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} className="input resize-none" />
@@ -412,6 +468,39 @@ export default function EditProduct() {
       <button onClick={save} disabled={saving} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60 mb-8">
         {saving ? t("loading") : t("save")}
       </button>
+
+      {photos.length > 0 && (
+        <div className="border-t border-border pt-5 mb-6">
+          <div className="text-sm font-extrabold mb-1">{lang === "en" ? "Make color / design options from photos" : "ছবি থেকে রঙ / ডিজাইন অপশন বানান"}</div>
+          <div className="text-xs text-mute mb-3">
+            {lang === "en"
+              ? "Tap each photo that is a separate color/design, type its name (e.g. Red, Design 2). Each becomes an option with its own photo and stock; customers pick it with the photo and the order shows it."
+              : "যে ছবিগুলো আলাদা রঙ/ডিজাইন সেগুলোতে চাপ দিন, নিচে নাম লিখুন (যেমন লাল, ডিজাইন ২)। প্রতিটা ছবি আলাদা অপশন হবে — কাস্টমার ছবি দেখে বাছবে, অর্ডারেও ওই ছবি ও নাম আসবে।"}
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {photos.map((img, i) => {
+              const on = optSel[img.id] !== undefined;
+              return (
+                <div key={img.id} className={`rounded-xl border-2 p-1 ${on ? "border-orange bg-orange-tint" : "border-border bg-white"}`}>
+                  <button type="button" onClick={() => setOptSel((m) => { const n = { ...m }; if (on) delete n[img.id]; else n[img.id] = ""; return n; })} className="press block w-full aspect-square rounded-lg overflow-hidden">
+                    <img src={img.thumbnail_url ?? img.url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                  {on && (
+                    <input value={optSel[img.id]} onChange={(e) => setOptSel((m) => ({ ...m, [img.id]: e.target.value }))} placeholder={`${lang === "en" ? "Name" : "নাম"} ${i + 1}`} className="input mt-1 !py-1.5 !text-xs" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input value={optSizes} onChange={(e) => setOptSizes(e.target.value)} placeholder={lang === "en" ? "Sizes (optional): M, L" : "সাইজ (ঐচ্ছিক): M, L"} className="input" />
+            <input type="number" value={optQty} onChange={(e) => setOptQty(e.target.value)} placeholder={lang === "en" ? "Stock each" : "প্রতিটার স্টক"} className="input" />
+          </div>
+          <button onClick={createOptionsFromPhotos} disabled={optSaving} className="press w-full bg-orange text-white font-bold text-sm py-3 rounded-xl disabled:opacity-60">
+            {optSaving ? t("loading") : lang === "en" ? "Create options" : "অপশন তৈরি করুন"}
+          </button>
+        </div>
+      )}
 
       {colorList.length > 0 && photos.length > 0 && (
         <div className="border-t border-border pt-5 mb-6">

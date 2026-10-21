@@ -1,3 +1,4 @@
+import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { Megaphone, Trash2, Check, X, Plus } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -34,12 +35,18 @@ export default function Notices() {
     load();
   }, []);
 
+  async function pairText(side: "bn" | "en") {
+    const r = await autoPair(side, textBn, textEn);
+    if (r?.bn !== undefined) setTextBn(r.bn);
+    if (r?.en !== undefined) setTextEn(r.en);
+  }
+
   async function addNotice() {
-    if (!textBn.trim()) return showToast(L("বাংলা টেক্সট লিখুন", "Enter Bangla text"), "error");
+    if (!textBn.trim() && !textEn.trim()) return showToast(L("বাংলা টেক্সট লিখুন", "Enter Bangla text"), "error");
     setSaving(true);
     const nextOrder = notices.length ? Math.max(...notices.map((n) => n.sort_order)) + 1 : 1;
     const { error } = await supabase.from("notices").insert({
-      text_bn: textBn.trim(),
+      text_bn: textBn.trim() || textEn.trim(),
       text_en: textEn.trim() || textBn.trim(),
       sort_order: nextOrder,
       is_active: true
@@ -81,12 +88,14 @@ export default function Notices() {
         <textarea
           value={textBn}
           onChange={(e) => setTextBn(e.target.value)}
+          onBlur={() => pairText("bn")}
           placeholder={L("বাংলা টেক্সট", "Bangla text")}
           className="input min-h-[60px]"
         />
         <textarea
           value={textEn}
           onChange={(e) => setTextEn(e.target.value)}
+          onBlur={() => pairText("en")}
           placeholder={L("ইংরেজি টেক্সট (ঐচ্ছিক)", "English text (optional)")}
           className="input min-h-[60px]"
         />

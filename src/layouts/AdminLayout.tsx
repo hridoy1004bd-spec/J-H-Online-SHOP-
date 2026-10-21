@@ -56,7 +56,8 @@ export default function AdminLayout() {
     { to: "/admin/faq", icon: HelpCircle, label: lang === "en" ? "FAQ" : "সাধারণ প্রশ্ন (FAQ)" },
     { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি" },
     { to: "/admin/telecom", icon: Smartphone, label: "J H Telecom Reseller" },
-    { to: "/admin/dropship", icon: Truck, label: lang === "en" ? "Dropshipping" : "ড্রপশিপিং" }
+    { to: "/admin/dropship", icon: Truck, label: lang === "en" ? "Dropshipping" : "ড্রপশিপিং" },
+    { to: "/admin/optimize-images", icon: Image, label: lang === "en" ? "Shrink images" : "ছবি ছোট করুন" }
   ];
 
   return (

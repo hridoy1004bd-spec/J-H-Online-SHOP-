@@ -1,3 +1,4 @@
+import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, X, Sparkles } from "lucide-react";
@@ -76,6 +77,24 @@ export default function AddProduct() {
       setNameEn(nameInput);
       setNameBn((prev) => (prev.endsWith("(বাংলা অনুবাদ প্রয়োজন)") || !prev ? autoTranslateLabel(nameInput, true) : prev));
     }
+  }, [nameInput]);
+
+  async function pairName(side: "bn" | "en") {
+    const r = await autoPair(side, nameBn, nameEn);
+    if (r?.bn !== undefined) setNameBn(r.bn);
+    if (r?.en !== undefined) setNameEn(r.en);
+  }
+
+  // মূল নাম ঘরে লেখা থামলে (১ সেকেন্ড) আসল অনুবাদ বসে
+  useEffect(() => {
+    if (!nameInput.trim()) return;
+    const h = setTimeout(async () => {
+      const side = /[\u0980-\u09FF]/.test(nameInput) ? "bn" : "en";
+      const r = await autoPair(side, side === "bn" ? nameInput : "", side === "en" ? nameInput : "");
+      if (r?.bn !== undefined) setNameBn(r.bn);
+      if (r?.en !== undefined) setNameEn(r.en);
+    }, 1000);
+    return () => clearTimeout(h);
   }, [nameInput]);
 
   const discount = oldPrice && price && Number(oldPrice) > Number(price)
@@ -208,10 +227,10 @@ export default function AddProduct() {
       {nameInput && (
         <div className="grid grid-cols-2 gap-3 -mt-1 mb-4">
           <Field label={`${t("productName")} (EN)`}>
-            <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} className="input" />
+            <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} onBlur={() => pairName("en")} className="input" />
           </Field>
           <Field label={`${t("productName")} (বাংলা)`}>
-            <input value={nameBn} onChange={(e) => setNameBn(e.target.value)} className="input" />
+            <input value={nameBn} onChange={(e) => setNameBn(e.target.value)} onBlur={() => pairName("bn")} className="input" />
           </Field>
         </div>
       )}

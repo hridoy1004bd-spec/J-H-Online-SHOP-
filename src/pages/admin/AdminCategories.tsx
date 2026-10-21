@@ -1,3 +1,4 @@
+import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Upload, ArrowUp, ArrowDown, Eye, EyeOff, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -95,6 +96,19 @@ export default function AdminCategories() {
       setUploading(false);
       e.target.value = "";
     }
+  }
+
+  async function pairForm(field: "name" | "note", side: "bn" | "en" = "bn") {
+    if (!form) return;
+    const r = await autoPair(side, (form as any)[`${field}_bn`] ?? "", (form as any)[`${field}_en`] ?? "");
+    if (!r) return;
+    setForm((f) => (f ? { ...f, ...(r.bn !== undefined ? { [`${field}_bn`]: r.bn } : {}), ...(r.en !== undefined ? { [`${field}_en`]: r.en } : {}) } : f));
+  }
+
+  async function pairAll(side: "bn" | "en") {
+    const r = await autoPair(side, allNoteBn, allNoteEn);
+    if (r?.bn !== undefined) setAllNoteBn(r.bn);
+    if (r?.en !== undefined) setAllNoteEn(r.en);
   }
 
   async function save() {
@@ -217,8 +231,8 @@ export default function AdminCategories() {
             <div className="font-extrabold text-sm">{form.id ? L("ক্যাটাগরি এডিট", "Edit category") : L("নতুন ক্যাটাগরি", "New category")}</div>
             <button onClick={() => setForm(null)} className="press"><X size={18} /></button>
           </div>
-          <input className="input" placeholder={L("বাংলা নাম — যেমন মোবাইল ও গ্যাজেট", "Bangla name")} value={form.name_bn} onChange={(e) => setForm({ ...form, name_bn: e.target.value })} />
-          <input className="input" placeholder={L("ইংরেজি নাম — যেমন Mobile & Gadgets", "English name")} value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+          <input className="input" placeholder={L("বাংলা নাম — যেমন মোবাইল ও গ্যাজেট", "Bangla name")} value={form.name_bn} onChange={(e) => setForm({ ...form, name_bn: e.target.value })} onBlur={() => pairForm("name")} />
+          <input className="input" placeholder={L("ইংরেজি নাম — যেমন Mobile & Gadgets", "English name")} value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} onBlur={() => pairForm("name", "en")} />
           <select className="input" value={form.parent_id} onChange={(e) => setForm({ ...form, parent_id: e.target.value })}>
             <option value="">{L("— মূল ক্যাটাগরি (প্রধান)", "— Main category")}</option>
             {tops.filter((t) => t.id !== form.id).map((t) => (
@@ -240,8 +254,8 @@ export default function AdminCategories() {
           </div>
           <div className="text-[11px] text-mute">{L("ছবি না দিলে ওই ক্যাটাগরির পণ্যের ছবি নিজে থেকে বসবে।", "Without an image, a product photo from it is used.")}</div>
           <div className="text-xs font-bold text-mute">{L("নোট (ডেলিভারি কোথায় কোথায় দেবেন ইত্যাদি)", "Note (e.g. delivery areas)")}</div>
-          <textarea className="input resize-none" rows={3} placeholder={L("যেমন: শুধু চৌদ্দগ্রাম ও কুমিল্লা শহরে ডেলিভারি। ফাঁকা রাখলে নোট দেখাবে না।", "Bangla note")} value={form.note_bn} onChange={(e) => setForm({ ...form, note_bn: e.target.value })} />
-          <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={form.note_en} onChange={(e) => setForm({ ...form, note_en: e.target.value })} />
+          <textarea className="input resize-none" rows={3} placeholder={L("যেমন: শুধু চৌদ্দগ্রাম ও কুমিল্লা শহরে ডেলিভারি। ফাঁকা রাখলে নোট দেখাবে না।", "Bangla note")} value={form.note_bn} onChange={(e) => setForm({ ...form, note_bn: e.target.value })} onBlur={() => pairForm("note")} />
+          <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={form.note_en} onChange={(e) => setForm({ ...form, note_en: e.target.value })} onBlur={() => pairForm("note", "en")} />
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
             {L("চালু (সাইটে দেখাবে)", "Active (show on site)")}
@@ -255,8 +269,8 @@ export default function AdminCategories() {
       <div className="bg-white border border-border rounded-2xl p-3 mb-4 space-y-2">
         <div className="font-extrabold text-sm">{L("সব পণ্যের উপরের নোট", "Note above All products")}</div>
         <div className="text-[11px] text-mute">{L("ক্যাটাগরি না বেছে সব পণ্যের পেইজে এই নোট ওপরে দেখাবে। ফাঁকা রাখলে দেখাবে না।", "Shown above the all-products page. Leave empty to hide.")}</div>
-        <textarea className="input resize-none" rows={2} placeholder={L("বাংলা নোট", "Bangla note")} value={allNoteBn} onChange={(e) => setAllNoteBn(e.target.value)} />
-        <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={allNoteEn} onChange={(e) => setAllNoteEn(e.target.value)} />
+        <textarea className="input resize-none" rows={2} placeholder={L("বাংলা নোট", "Bangla note")} value={allNoteBn} onChange={(e) => setAllNoteBn(e.target.value)} onBlur={() => pairAll("bn")} />
+        <textarea className="input resize-none" rows={2} placeholder={L("English note (ঐচ্ছিক)", "English note (optional)")} value={allNoteEn} onChange={(e) => setAllNoteEn(e.target.value)} onBlur={() => pairAll("en")} />
         <button onClick={saveAllNote} disabled={allSaving} className="press w-full bg-teal text-white font-bold text-sm py-2.5 rounded-xl disabled:opacity-60">
           {allSaving ? L("সেভ হচ্ছে...", "Saving...") : L("নোট সেভ করুন", "Save note")}
         </button>

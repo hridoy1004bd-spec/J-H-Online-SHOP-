@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpDown, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Send } from "lucide-react";
 import { OPERATORS, PACK_CATEGORIES, TelPack, TelRecharge, TelSettings, detectOperator, fmtDate, money, telRpcPin, toMinor } from "../services/telecomService";
 import { bdErr, opColor } from "../services/bdService";
 
@@ -34,45 +34,68 @@ function OpDot({ op, size = 36 }: { op: string; size?: number }) {
   );
 }
 
-/** চেপে ধরে রাখলে সম্পন্ন হয় */
+/** চেপে ধরে রাখলে সম্পন্ন হয় (iOS/Android টাচ + মাউস, টাইমার ভিত্তিক) */
 function HoldButton({ label, disabled, onDone }: { label: string; disabled: boolean; onDone: () => void }) {
   const [p, setP] = useState(0);
   const raf = useRef(0);
   const t0 = useRef(0);
+  const active = useRef(false);
+  const lastTouch = useRef(0);
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   function stop() {
+    active.current = false;
     cancelAnimationFrame(raf.current);
     setP(0);
   }
   function tick() {
-    const v = Math.min(1, (performance.now() - t0.current) / 900);
+    if (!active.current) return;
+    const v = Math.min(1, (Date.now() - t0.current) / 800);
     setP(v);
     if (v >= 1) {
+      active.current = false;
       setP(0);
-      onDone();
+      try { navigator.vibrate?.(30); } catch { /* ignore */ }
+      doneRef.current();
     } else raf.current = requestAnimationFrame(tick);
   }
   function start() {
-    if (disabled) return;
-    t0.current = performance.now();
+    if (disabled || active.current) return;
+    active.current = true;
+    t0.current = Date.now();
     raf.current = requestAnimationFrame(tick);
   }
+  const R = 34;
+  const C = 2 * Math.PI * R;
+  const noSel = { userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" } as React.CSSProperties;
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onPointerDown={start}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-      onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={(e) => e.key === "Enter" && !disabled && onDone()}
-      style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
-      className="relative w-full overflow-hidden rounded-2xl bg-[#2b4797] text-white font-extrabold text-sm py-4 disabled:opacity-50"
-    >
-      <span className="absolute inset-y-0 left-0 bg-white/30" style={{ width: `${p * 100}%` }} />
-      <span className="relative">{label}</span>
-    </button>
+    <div className="relative mt-6 -mx-4 select-none" style={noSel} translate="no">
+      <div className="bg-[#2b4797] pt-12 pb-4 text-center text-white font-extrabold text-sm" style={{ borderTopLeftRadius: "50% 38px", borderTopRightRadius: "50% 38px" }}>
+        <div className="mt-8">{label}</div>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={label}
+        onTouchStart={() => { lastTouch.current = Date.now(); start(); }}
+        onTouchEnd={stop}
+        onTouchCancel={stop}
+        onMouseDown={() => { if (Date.now() - lastTouch.current > 700) start(); }}
+        onMouseUp={stop}
+        onMouseLeave={stop}
+        onContextMenu={(e) => e.preventDefault()}
+        onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !disabled) { e.preventDefault(); doneRef.current(); } }}
+        style={noSel}
+        className="absolute left-1/2 -translate-x-1/2 -top-8 w-[76px] h-[76px] rounded-full bg-white shadow-lg flex items-center justify-center disabled:opacity-60"
+      >
+        <svg className="absolute inset-0" viewBox="0 0 76 76" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="38" cy="38" r={R} fill="none" stroke="#e5e7eb" strokeWidth="4" />
+          <circle cx="38" cy="38" r={R} fill="none" stroke="#2b4797" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - p)} />
+        </svg>
+        <Send size={28} className="text-[#2b4797] relative" style={{ transform: `scale(${1 + p * 0.15})` }} />
+      </button>
+    </div>
   );
 }
 

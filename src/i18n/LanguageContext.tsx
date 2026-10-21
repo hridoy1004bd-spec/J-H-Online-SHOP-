@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { translations, TranslationKey } from "./translations";
 import { Lang } from "../types";
+import { startDomTranslate, stopDomTranslate, restoreDialogs } from "./domTranslate";
 
 interface LanguageContextValue {
   lang: Lang;
@@ -22,6 +23,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, lang);
     document.documentElement.lang = lang;
+    // English হলে পাতার বাকি বাংলা লেখাও অভিধান থেকে ইংরেজি হয়; বাংলায় ফিরলে আসল লেখা ফেরে
+    if (lang === "en") startDomTranslate();
+    else {
+      stopDomTranslate();
+      restoreDialogs();
+    }
   }, [lang]);
 
   const value = useMemo<LanguageContextValue>(

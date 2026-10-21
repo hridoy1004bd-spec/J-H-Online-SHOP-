@@ -1,3 +1,4 @@
+import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -36,11 +37,11 @@ export default function AdminMenu() {
   }
 
   async function save(i: Item) {
-    if (!i.label_bn.trim() || !i.link.trim()) return showToast("নাম ও লিংক দিন", "error");
+    if (!(i.label_bn.trim() || (i.label_en ?? "").trim()) || !i.link.trim()) return showToast("নাম ও লিংক দিন", "error");
     const { error } = await supabase
       .from("menu_items")
       .update({
-        label_bn: i.label_bn.trim(),
+        label_bn: i.label_bn.trim() || (i.label_en ?? "").trim(),
         label_en: i.label_en?.trim() || null,
         icon: i.icon,
         link: i.link.trim(),
@@ -70,11 +71,23 @@ export default function AdminMenu() {
     load();
   }
 
+  async function pairNew(side: "bn" | "en") {
+    const r = await autoPair(side, newItem.label_bn, newItem.label_en);
+    if (!r) return;
+    setNewItem((x) => ({ ...x, ...(r.bn !== undefined ? { label_bn: r.bn } : {}), ...(r.en !== undefined ? { label_en: r.en } : {}) }));
+  }
+
+  async function pairRow(row: any, side: "bn" | "en") {
+    const r = await autoPair(side, row.label_bn ?? "", row.label_en ?? "");
+    if (!r) return;
+    edit(row.id, { ...(r.bn !== undefined ? { label_bn: r.bn } : {}), ...(r.en !== undefined ? { label_en: r.en } : {}) } as any);
+  }
+
   async function add() {
-    if (!newItem.label_bn.trim() || !newItem.link.trim()) return showToast("নাম ও লিংক দিন", "error");
+    if (!(newItem.label_bn.trim() || newItem.label_en.trim()) || !newItem.link.trim()) return showToast("নাম ও লিংক দিন", "error");
     const max = items.reduce((m, i) => Math.max(m, i.sort_order), 0);
     const { error } = await supabase.from("menu_items").insert({
-      label_bn: newItem.label_bn.trim(),
+      label_bn: newItem.label_bn.trim() || newItem.label_en.trim(),
       label_en: newItem.label_en.trim() || null,
       icon: newItem.icon,
       link: newItem.link.trim(),
@@ -95,8 +108,8 @@ export default function AdminMenu() {
 
       <div className="bg-white border border-border rounded-2xl p-4 mb-5 space-y-2">
         <div className="font-extrabold text-sm">+ নতুন মেনু আইটেম</div>
-        <input value={newItem.label_bn} onChange={(e) => setNewItem({ ...newItem, label_bn: e.target.value })} placeholder="নাম (বাংলা)" className="input" />
-        <input value={newItem.label_en} onChange={(e) => setNewItem({ ...newItem, label_en: e.target.value })} placeholder="Name (English, ঐচ্ছিক)" className="input" />
+        <input value={newItem.label_bn} onChange={(e) => setNewItem({ ...newItem, label_bn: e.target.value })} onBlur={() => pairNew("bn")} placeholder="নাম (বাংলা)" className="input" />
+        <input value={newItem.label_en} onChange={(e) => setNewItem({ ...newItem, label_en: e.target.value })} onBlur={() => pairNew("en")} placeholder="Name (English, ঐচ্ছিক)" className="input" />
         <input value={newItem.link} onChange={(e) => setNewItem({ ...newItem, link: e.target.value })} placeholder="/page বা https://..." className="input" />
         <select value={newItem.icon} onChange={(e) => setNewItem({ ...newItem, icon: e.target.value })} className="input">
           {Object.entries(MENU_ICONS).map(([k, v]) => (
@@ -120,7 +133,7 @@ export default function AdminMenu() {
                 <span className="w-8 h-8 rounded-full bg-teal-tint text-teal-dark flex items-center justify-center shrink-0">
                   <MenuIcon name={i.icon} size={16} />
                 </span>
-                <input value={i.label_bn} onChange={(e) => edit(i.id, { label_bn: e.target.value })} className="input flex-1 min-w-0" />
+                <input value={i.label_bn} onChange={(e) => edit(i.id, { label_bn: e.target.value })} onBlur={() => pairRow(i, "bn")} className="input flex-1 min-w-0" />
                 <button onClick={() => move(idx, -1)} className="press text-mute p-1" aria-label="up">
                   <ArrowUp size={16} />
                 </button>

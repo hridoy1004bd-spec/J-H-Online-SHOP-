@@ -87,6 +87,9 @@ export default function ProductDetails() {
   const colors = [...new Set((product.product_variants ?? []).map((v) => v.color).filter(Boolean))] as string[];
   const colorImage = (c: string | null): string | null =>
     c ? (product.product_variants ?? []).find((v) => v.color === c && v.image_url)?.image_url ?? null : null;
+  // রঙের অপশনে ছবি থাকলে একই ছবির গ্যালারি সারি আলাদা করে দেখানো হয় না (শুধু বাড়তি ছবি থাকলে দেখায়)
+  const colorImgSet = new Set(colors.map((c) => colorImage(c)).filter(Boolean) as string[]);
+  const showGallery = images.length > 1 && (colorImgSet.size === 0 || images.some((im) => !colorImgSet.has(im.url)));
   const selectedVariant = (product.product_variants ?? []).find(
     (v) => (sizes.length === 0 || v.size === size) && (colors.length === 0 || v.color === color)
   );
@@ -156,7 +159,7 @@ export default function ProductDetails() {
             <ShoppingBag className="text-teal/30" size={64} />
           )}
         </div>
-        {images.length > 1 && (
+        {showGallery && (
           <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
             {images.map((img, i) => (
               <button

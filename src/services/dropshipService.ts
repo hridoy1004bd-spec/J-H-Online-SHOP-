@@ -26,7 +26,7 @@ export interface DsProduct {
   product_id: string;
   wholesale: number;
   is_active: boolean;
-  products?: { name_bn: string | null; name_en: string | null; current_price?: number; product_images?: DsProductImage[] } | null;
+  products?: { name_bn: string | null; name_en: string | null; current_price?: number; old_price?: number; product_images?: DsProductImage[] } | null;
 }
 export interface DsMy {
   partner_id: string;
@@ -173,4 +173,22 @@ export async function copyText(s: string): Promise<boolean> {
   }
 }
 
-export const PRODUCT_SELECT = "product_id,wholesale,is_active,products(name_bn,name_en,current_price,product_images(url,is_main,sort_order))";
+export const PRODUCT_SELECT = "product_id,wholesale,is_active,products(name_bn,name_en,current_price,old_price,product_images(url,is_main,sort_order))";
+
+/** পণ্য ফর্ম থেকে ড্রপশিপিং অন/অফ ও পাইকারি মূল্য সেভ */
+export async function loadDropship(productId: string): Promise<{ on: boolean; price: string }> {
+  const { data } = await supabase.from("ds_products").select("wholesale,is_active").eq("product_id", productId).maybeSingle();
+  return data ? { on: !!data.is_active, price: String(data.wholesale ?? "") } : { on: false, price: "" };
+}
+
+export async function saveDropship(productId: string, on: boolean, price: string): Promise<void> {
+  if (on) {
+    const w = Number(price);
+    if (!(w > 0)) throw new Error("ড্রপশিপারদের জন্য মূল্য দিন");
+    const { error } = await supabase.from("ds_products").upsert({ product_id: productId, wholesale: w, is_active: true }, { onConflict: "product_id" });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("ds_products").update({ is_active: false }).eq("product_id", productId);
+    if (error) throw error;
+  }
+}

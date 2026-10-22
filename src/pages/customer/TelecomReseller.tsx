@@ -7,6 +7,8 @@ import TelecomReceipt, { ReceiptData } from "../../components/TelecomReceipt";
 import SaudiShop from "../../components/SaudiShop";
 import BdTopup from "../../components/BdTopup";
 import MobileBanking from "../../components/MobileBanking";
+import KycForm from "../../components/KycForm";
+import { kycErr } from "../../services/kycService";
 import { bdErr, parseBankSms, smsKey, uploadProof } from "../../services/bdService";
 import { BankAccount } from "../../services/saudiService";
 import {
@@ -177,9 +179,6 @@ export default function TelecomReseller() {
   const [shopCat, setShopCat] = useState("all");
 
   // আবেদন ফর্ম
-  const [aName, setAName] = useState("");
-  const [aCountry, setACountry] = useState("");
-  const [aMobile, setAMobile] = useState("");
   // ডিপজিট
   const [dMethod, setDMethod] = useState("");
   const [dCur, setDCur] = useState<Cur>("BDT");
@@ -250,7 +249,7 @@ export default function TelecomReseller() {
       await load();
       return true;
     } catch (e) {
-      showToast(bdErr(e), "error");
+      showToast(kycErr(e) ?? bdErr(e), "error");
       return false;
     } finally {
       setBusy(false);
@@ -397,12 +396,15 @@ export default function TelecomReseller() {
         <div className={card}>
           <div className="font-extrabold text-sm mb-1">রিসেলার হওয়ার আবেদন</div>
           <div className="text-[11px] text-mute mb-3">অ্যাডমিন অনুমোদন দিলে ওয়ালেট, পণ্য কেনা ও রিচার্জ চালু হবে।</div>
-          <input className="input mb-2" placeholder="আপনার নাম" value={aName} onChange={(e) => setAName(e.target.value)} />
-          <input className="input mb-2" placeholder="দেশ (যেমন KSA)" value={aCountry} onChange={(e) => setACountry(e.target.value)} />
-          <input className="input mb-3" placeholder="মোবাইল নম্বর" value={aMobile} onChange={(e) => setAMobile(e.target.value)} />
-          <button className={btn + " w-full"} disabled={busy} onClick={() => run(() => telRpc("telecom_apply", { p_name: aName, p_country: aCountry, p_mobile: aMobile }), "আবেদন জমা হয়েছে")}>
-            আবেদন করুন
-          </button>
+          <KycForm
+            kind="reseller"
+            busy={busy}
+            inpClass="input"
+            btnClass={btn}
+            ghostClass="press border border-border rounded-xl px-3 py-2.5 text-sm font-semibold"
+            onError={(m) => toast(m, "error")}
+            onSubmit={(k) => run(() => telRpc("telecom_apply2", { p: k }), "আবেদন জমা হয়েছে")}
+          />
         </div>
       </div>
     );

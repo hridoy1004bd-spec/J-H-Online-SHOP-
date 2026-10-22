@@ -1,3 +1,4 @@
+import KycView from "../../components/KycView";
 import React, { useCallback, useEffect, useState } from "react";
 import { Smartphone, Upload } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -373,6 +374,7 @@ export default function AdminTelecom() {
               </button>
               {sel?.id === r.id && (
                 <div className="mt-3 pt-3 border-t border-border">
+                  <KycView k={r as any} />
                   <div className="flex flex-wrap gap-2 mb-3">
                     <button className={btn} disabled={busy} onClick={() => run(() => telRpc("telecom_admin_set_status", { p_reseller: r.id, p_status: "Approved" }), "অনুমোদিত")}>অনুমোদন</button>
                     <button className={btnRed} disabled={busy} onClick={() => run(() => telRpc("telecom_admin_set_status", { p_reseller: r.id, p_status: "Rejected" }), "বাতিল")}>বাতিল</button>

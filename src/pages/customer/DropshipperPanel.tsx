@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeCheck, Box, ChartNoAxesCombined, Package, Search, Share2, ShoppingBag, Wallet } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import KycForm from "../../components/KycForm";
+import { kycErr } from "../../services/kycService";
 import { useToast } from "../../contexts/ToastContext";
 import {
   DS_STATUS_BN,
@@ -60,8 +62,6 @@ export default function DropshipperPanel() {
   const [search, setSearch] = useState("");
   const [prices, setPrices] = useState<Record<string, string>>({});
   // আবেদন
-  const [aName, setAName] = useState("");
-  const [aMobile, setAMobile] = useState("");
   // নতুন অর্ডার
   const [lines, setLines] = useState<Line[]>([{ product_id: "", qty: "1", variant: "" }]);
   const [cName, setCName] = useState("");
@@ -117,7 +117,7 @@ export default function DropshipperPanel() {
       await load();
       return true;
     } catch (e) {
-      showToast(dsErr(e), "error");
+      showToast(kycErr(e) ?? dsErr(e), "error");
       return false;
     } finally {
       setBusy(false);
@@ -229,11 +229,15 @@ export default function DropshipperPanel() {
         <div className={box + " max-w-md"}>
           <h2 className="mb-1 text-lg font-bold">ড্রপশিপার হওয়ার আবেদন</h2>
           <p className="mb-4 text-xs text-slate-500">অ্যাডমিন অনুমোদন দিলে পণ্য যোগ করা, শেয়ার লিংক ও অর্ডার দেওয়া চালু হবে।</p>
-          <input className={inp + " mb-2"} placeholder="আপনার নাম" value={aName} onChange={(e) => setAName(e.target.value)} />
-          <input className={inp + " mb-3"} inputMode="numeric" maxLength={11} placeholder="মোবাইল নম্বর 01XXXXXXXXX" value={aMobile} onChange={(e) => setAMobile(e.target.value.replace(/\D/g, ""))} />
-          <button className={btnG + " w-full"} disabled={busy} onClick={() => run(() => dsRpc("ds_apply", { p_name: aName, p_mobile: aMobile }), "আবেদন জমা হয়েছে")}>
-            আবেদন করুন
-          </button>
+          <KycForm
+            kind="dropship"
+            busy={busy}
+            inpClass={inp}
+            btnClass={btnG}
+            ghostClass={btnL}
+            onError={(m) => showToast(m, "error")}
+            onSubmit={(k) => run(() => dsRpc("ds_apply2", { p: k }), "আবেদন জমা হয়েছে")}
+          />
         </div>
       </>
     );
@@ -312,6 +316,19 @@ export default function DropshipperPanel() {
                     <h3 className="min-h-10 text-sm font-bold text-slate-900">{productTitle(p)}</h3>
                     <p className="mt-2 text-xs text-slate-500">পাইকারি দাম</p>
                     <p className="text-lg font-extrabold">{tk(p.wholesale)}</p>
+                    {p.products?.current_price ? (
+                      <p className="mt-1 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-600">
+                        সাইটে বিক্রি হচ্ছে <b>{tk(p.products.current_price)}</b>
+                        {p.products.old_price && Number(p.products.old_price) > Number(p.products.current_price) ? (
+                          <>
+                            {" "}
+                            (পূর্বের মূল্য <s>{tk(p.products.old_price)}</s>)
+                          </>
+                        ) : null}
+                        <br />
+                        আইডিয়ার জন্য। আপনি নিজের ইচ্ছামতো দামে বিক্রি করতে পারবেন।
+                      </p>
+                    ) : null}
                     <label className="mt-2 block text-xs font-semibold text-slate-500">আপনার বিক্রয়মূল্য (৳)</label>
                     <input className={inp + " mt-1"} type="number" inputMode="decimal" placeholder={`কমপক্ষে ${p.wholesale}`} value={val} onChange={(e) => setPrices({ ...prices, [p.product_id]: e.target.value })} />
                     {profit !== null && <p className={`mt-1 text-xs font-bold ${profit < 0 ? "text-red-600" : "text-emerald-700"}`}>{profit < 0 ? "দাম পাইকারির চেয়ে কম" : `প্রতি পিসে লাভ ${tk(profit)}`}</p>}

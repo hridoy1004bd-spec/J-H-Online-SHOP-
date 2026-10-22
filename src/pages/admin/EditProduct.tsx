@@ -1,4 +1,6 @@
 import { autoPair } from "../../services/translateService";
+import DropshipToggle from "../../components/DropshipToggle";
+import { loadDropship, saveDropship } from "../../services/dropshipService";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Upload, Plus, Trash2, Copy, Link as LinkIcon } from "lucide-react";
@@ -36,6 +38,7 @@ export default function EditProduct() {
   const [oldPrice, setOldPrice] = useState("");
   const [price, setPrice] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [ds, setDs] = useState<{ on: boolean; price: string }>({ on: false, price: "" });
   const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
 
   const [variants, setVariants] = useState<VariantRow[]>([]);
@@ -90,6 +93,10 @@ export default function EditProduct() {
   }
 
   useEffect(() => {
+    if (id) loadDropship(id).then(setDs).catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -128,6 +135,7 @@ export default function EditProduct() {
         })
         .eq("id", id);
       if (error) throw error;
+      await saveDropship(id, ds.on, ds.price);
 
       const existingCount = product?.product_images?.length ?? 0;
       for (let i = 0; i < newImages.length; i++) {
@@ -464,6 +472,8 @@ export default function EditProduct() {
         <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
         <span className="text-sm font-semibold">{t("activeProducts")}</span>
       </label>
+
+      <DropshipToggle on={ds.on} price={ds.price} oldPrice={oldPrice} currentPrice={price} onChange={setDs} />
 
       <button onClick={save} disabled={saving} className="press w-full bg-teal text-white font-bold text-sm py-3.5 rounded-xl disabled:opacity-60 mb-8">
         {saving ? t("loading") : t("save")}

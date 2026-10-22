@@ -1,3 +1,4 @@
+import KycView from "../../components/KycView";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Truck } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -158,6 +159,7 @@ export default function AdminDropship() {
               <div className="text-[11px] text-mute mt-1">
                 ব্যালেন্স {tk(p.balance)} · অর্ডার {orders.filter((o) => o.partner_id === p.id).length}টি
               </div>
+              <KycView k={p as any} />
               <div className="flex flex-wrap gap-2 mt-2">
                 <button className={btn} disabled={busy || p.status === "Approved"} onClick={() => run(() => dsRpc("ds_admin_set_partner_status", { p_id: p.id, p_status: "Approved" }), "অনুমোদিত")}>অনুমোদন</button>
                 <button className={btnRed} disabled={busy || p.status === "Rejected"} onClick={() => run(() => dsRpc("ds_admin_set_partner_status", { p_id: p.id, p_status: "Rejected" }), "বাতিল")}>বাতিল</button>

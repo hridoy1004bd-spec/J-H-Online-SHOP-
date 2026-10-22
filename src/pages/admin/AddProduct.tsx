@@ -1,4 +1,6 @@
 import { autoPair } from "../../services/translateService";
+import DropshipToggle from "../../components/DropshipToggle";
+import { saveDropship } from "../../services/dropshipService";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, X, Sparkles } from "lucide-react";
@@ -46,6 +48,7 @@ export default function AddProduct() {
   const [nameInput, setNameInput] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [nameBn, setNameBn] = useState("");
+  const [ds, setDs] = useState<{ on: boolean; price: string }>({ on: false, price: "" });
   const [desc, setDesc] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [brand, setBrand] = useState("");
@@ -124,6 +127,8 @@ export default function AddProduct() {
     if (!price || !oldPrice) return showToast(t("currentPrice"), "error");
     if (images.length === 0) return showToast(t("uploadImage"), "error");
 
+    if (ds.on && !(Number(ds.price) > 0)) return showToast("ড্রপশিপারদের জন্য মূল্য দিন", "error");
+
     setUploading(true);
     try {
       const generatedSku = sku.trim() || `JH-${Date.now().toString().slice(-8)}`;
@@ -152,6 +157,8 @@ export default function AddProduct() {
         .select()
         .single();
       if (error) throw error;
+
+      if (ds.on) await saveDropship(product.id, true, ds.price);
 
       // Upload + attach images
       for (let i = 0; i < images.length; i++) {
@@ -304,6 +311,8 @@ export default function AddProduct() {
       <Field label="Tags (comma separated, optional)">
         <input value={tags} onChange={(e) => setTags(e.target.value)} className="input" />
       </Field>
+
+      <DropshipToggle on={ds.on} price={ds.price} oldPrice={oldPrice} currentPrice={price} onChange={setDs} />
 
       <button
         onClick={publish}

@@ -1,3 +1,4 @@
+import { compressForUpload } from "../../services/uploadService";
 import React, { useEffect, useState } from "react";
 import { Image as ImageIcon, Trash2, Upload, Check, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -38,8 +39,9 @@ export default function FeaturedBanners() {
     if (!file) return;
     setUploading(true);
     try {
-      const path = `featured-${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-      const { error: upErr } = await supabase.storage.from("banners").upload(path, file, { upsert: true });
+      const c = await compressForUpload(file, 1280, 0.8);
+      const path = `featured-${Date.now()}.${c.ext}`;
+      const { error: upErr } = await supabase.storage.from("banners").upload(path, c.blob, { upsert: true, contentType: c.type, cacheControl: "31536000" });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("banners").getPublicUrl(path);
       const nextOrder = banners.length ? Math.max(...banners.map((b) => b.sort_order)) + 1 : 1;

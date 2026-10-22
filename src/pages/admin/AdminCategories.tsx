@@ -1,3 +1,4 @@
+import { compressForUpload } from "../../services/uploadService";
 import { autoPair } from "../../services/translateService";
 import React, { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Upload, ArrowUp, ArrowDown, Eye, EyeOff, X } from "lucide-react";
@@ -85,8 +86,9 @@ export default function AdminCategories() {
     if (!file || !form) return;
     setUploading(true);
     try {
-      const path = `cat-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
-      const { error } = await supabase.storage.from("banners").upload(path, file, { upsert: true });
+      const c = await compressForUpload(file, 480, 0.8);
+      const path = `cat-${Date.now()}.${c.ext}`;
+      const { error } = await supabase.storage.from("banners").upload(path, c.blob, { upsert: true, contentType: c.type, cacheControl: "31536000" });
       if (error) throw error;
       const { data } = supabase.storage.from("banners").getPublicUrl(path);
       setForm({ ...form, image_url: data.publicUrl });

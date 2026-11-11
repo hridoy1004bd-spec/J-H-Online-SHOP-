@@ -20,6 +20,8 @@ import {
   LayoutGrid,
   Smartphone,
   Truck,
+  Crown,
+  Percent,
   Menu,
   X,
   LogOut
@@ -57,6 +59,8 @@ export default function AdminLayout() {
     { to: "/admin/categories", icon: LayoutGrid, label: lang === "en" ? "Categories" : "ক্যাটাগরি" },
     { to: "/admin/telecom", icon: Smartphone, label: "J H Telecom Reseller" },
     { to: "/admin/dropship", icon: Truck, label: lang === "en" ? "Dropshipping" : "ড্রপশিপিং" },
+    { to: "/admin/subscriptions", icon: Crown, label: lang === "en" ? "Subscriptions" : "সাবস্ক্রিপশন" },
+    { to: "/admin/commission", icon: Percent, label: lang === "en" ? "Commission & tiers" : "কমিশন ও স্তর" },
     { to: "/admin/optimize-images", icon: Image, label: lang === "en" ? "Shrink images" : "ছবি ছোট করুন" }
   ];
 

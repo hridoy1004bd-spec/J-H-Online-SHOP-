@@ -44,6 +44,8 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminTelecom from "./pages/admin/AdminTelecom";
 import AdminDropship from "./pages/admin/AdminDropship";
 import OptimizeImages from "./pages/admin/OptimizeImages";
+import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
+import AdminCommission from "./pages/admin/AdminCommission";
 
 function ThemeSync() {
   const { pathname } = useLocation();
@@ -101,6 +103,8 @@ export default function App() {
         <Route path="telecom" element={<AdminTelecom />} />
         <Route path="dropship" element={<AdminDropship />} />
         <Route path="optimize-images" element={<OptimizeImages />} />
+        <Route path="subscriptions" element={<AdminSubscriptions />} />
+        <Route path="commission" element={<AdminCommission />} />
       </Route>
     </Routes>
     </>

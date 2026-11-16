@@ -1,3 +1,4 @@
+import { maybeAutoBook } from "../../services/courierService";
 import React, { useEffect, useState } from "react";
 import { ClipboardList, CheckCircle2, AlertTriangle, Truck } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -76,6 +77,11 @@ export default function AdminOrders() {
       body_bn: `অর্ডার ${order.order_number} এখন ${status}।`,
       related_order_id: order.id
     });
+
+    if (status === "confirmed") {
+      const failMsg = await maybeAutoBook(order.id);
+      if (failMsg) return (showToast("অর্ডার কনফার্ম হয়েছে, কিন্তু কুরিয়ার বুকিং ব্যর্থ: " + failMsg, "error"), load());
+    }
 
     showToast(t("save") + " ✓");
     load();

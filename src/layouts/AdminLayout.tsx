@@ -22,6 +22,7 @@ import {
   Truck,
   Crown,
   Percent,
+  UserPlus,
   Menu,
   X,
   LogOut
@@ -61,6 +62,8 @@ export default function AdminLayout() {
     { to: "/admin/dropship", icon: Truck, label: lang === "en" ? "Dropshipping" : "ড্রপশিপিং" },
     { to: "/admin/subscriptions", icon: Crown, label: lang === "en" ? "Subscriptions" : "সাবস্ক্রিপশন" },
     { to: "/admin/commission", icon: Percent, label: lang === "en" ? "Commission & tiers" : "কমিশন ও স্তর" },
+    { to: "/admin/courier", icon: Truck, label: lang === "en" ? "Courier" : "কুরিয়ার" },
+    { to: "/admin/accounts", icon: UserPlus, label: lang === "en" ? "Accounts & links" : "অ্যাকাউন্ট ও লিংক" },
     { to: "/admin/optimize-images", icon: Image, label: lang === "en" ? "Shrink images" : "ছবি ছোট করুন" }
   ];
 

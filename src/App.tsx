@@ -1,3 +1,5 @@
+import AdminCourier from "./pages/admin/AdminCourier";
+import AdminAccounts from "./pages/admin/AdminAccounts";
 import React from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { applyTheme } from "./utils/theme";
@@ -105,6 +107,8 @@ export default function App() {
         <Route path="optimize-images" element={<OptimizeImages />} />
         <Route path="subscriptions" element={<AdminSubscriptions />} />
         <Route path="commission" element={<AdminCommission />} />
+        <Route path="courier" element={<AdminCourier />} />
+        <Route path="accounts" element={<AdminAccounts />} />
       </Route>
     </Routes>
     </>

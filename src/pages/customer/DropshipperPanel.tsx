@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { BadgeCheck, Box, ChartNoAxesCombined, Package, Search, Share2, ShoppingBag, Wallet } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import KycForm from "../../components/KycForm";
+import DsResellers from "../../components/DsResellers";
 import { kycErr } from "../../services/kycService";
 import { useToast } from "../../contexts/ToastContext";
 import {
@@ -26,13 +27,14 @@ import {
   tk
 } from "../../services/dropshipService";
 
-type Tab = "products" | "mine" | "order" | "orders" | "earn";
+type Tab = "products" | "mine" | "order" | "orders" | "earn" | "resellers";
 const TABS: { k: Tab; label: string }[] = [
   { k: "products", label: "Products" },
   { k: "mine", label: "My Products" },
   { k: "order", label: "নতুন অর্ডার" },
   { k: "orders", label: "My Orders" },
-  { k: "earn", label: "Earnings" }
+  { k: "earn", label: "Earnings" },
+  { k: "resellers", label: "আমার রিসেলার" }
 ];
 
 const box = "rounded-2xl border border-slate-100 bg-white p-5 shadow-sm";
@@ -464,6 +466,8 @@ export default function DropshipperPanel() {
           ))}
         </section>
       )}
+
+      {tab === "resellers" && <DsResellers />}
 
       {tab === "earn" && (
         <>

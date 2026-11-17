@@ -39,6 +39,20 @@ export async function accountCreate(body: Record<string, unknown>) {
 
 export default function AdminAccounts() {
   const { showToast } = useToast();
+  const [pw, setPw] = useState({ mobile: "", password: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+  async function setPassword() {
+    setPwBusy(true);
+    try {
+      const { error } = await supabase.functions.invoke("account-create", { body: { action: "set_password", ...pw } });
+      if (error) throw new Error("পাসওয়ার্ড বদলানো যায়নি (নম্বর ঠিক আছে? পাসওয়ার্ড ৬+ অক্ষর?)");
+      showToast("পাসওয়ার্ড বদলানো হয়েছে ✓");
+      setPw({ mobile: "", password: "" });
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    }
+    setPwBusy(false);
+  }
   const [role, setRole] = useState<"dropshipper" | "reseller">("dropshipper");
   const [f, setF] = useState({ name: "", mobile: "", password: "" });
   const [saving, setSaving] = useState(false);
@@ -102,6 +116,16 @@ export default function AdminAccounts() {
         <input className="input mb-3" type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
         <button className={btn} disabled={saving} onClick={create}>{saving ? "..." : "অ্যাকাউন্ট খুলুন (অনুমোদিত)"}</button>
         <p className="text-[11px] text-mute mt-2">একজন ব্যক্তি = একটি ভূমিকা। ড্রপশিপার/রিসেলারের ডকুমেন্ট (আইডি, ছবি) পরে KYC ফর্ম থেকে নেওয়া যাবে।</p>
+      </div>
+
+      <div className={card}>
+        <div className="font-extrabold text-sm mb-1">পাসওয়ার্ড রিসেট (ব্যবহারকারীর আবেদনে)</div>
+        <label className={lbl}>মোবাইল নম্বর</label>
+        <input className="input mb-2" inputMode="numeric" value={pw.mobile} onChange={(e) => setPw({ ...pw, mobile: e.target.value })} />
+        <label className={lbl}>নতুন পাসওয়ার্ড</label>
+        <input className="input mb-3" value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} />
+        <button className={btn} disabled={pwBusy || pw.mobile.length < 11 || pw.password.length < 6} onClick={setPassword}>{pwBusy ? "..." : "পাসওয়ার্ড বদলান"}</button>
+        <p className="text-[11px] text-mute mt-2">পিন রিসেট: অ্যাডমিন → টেলিকম → রিসেলার ট্যাবে আগের মতোই আছে।</p>
       </div>
 
       <h2 className="font-extrabold text-sm mb-2">রিসেলার → ড্রপশিপার লিংক ও বাড়তি কমিশন (%)</h2>

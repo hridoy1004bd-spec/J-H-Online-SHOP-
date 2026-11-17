@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Copy, Eye, EyeOff, Smartphone } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Banknote, Clock, Copy, CreditCard, Eye, EyeOff, FileText, Gift, Home as HomeIcon, KeyRound, Landmark, LucideIcon, LogOut, Menu, Moon, Percent, Receipt, ShieldCheck, ShoppingBag, Smartphone, Sparkles, Ticket, UserPlus, Users2, Wallet, Wifi, Lock } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../contexts/ToastContext";
 import TelecomReceipt, { ReceiptData } from "../../components/TelecomReceipt";
@@ -8,6 +8,12 @@ import SaudiShop from "../../components/SaudiShop";
 import BdTopup from "../../components/BdTopup";
 import MobileBanking from "../../components/MobileBanking";
 import KycForm from "../../components/KycForm";
+import HelpRequest from "../../components/reseller/HelpRequest";
+import { LockScreen, SetPinScreen } from "../../components/reseller/PinGate";
+import ServiceRequest from "../../components/reseller/ServiceRequest";
+import Namaz from "../../components/reseller/Namaz";
+import { AddUser, MyUsers, MyRates } from "../../components/reseller/TeamUsers";
+import { isUnlocked, setUnlocked as persistUnlock } from "../../services/resellerService";
 import { kycErr } from "../../services/kycService";
 import { bdErr, parseBankSms, smsKey, uploadProof } from "../../services/bdService";
 import { BankAccount } from "../../services/saudiService";
@@ -37,20 +43,29 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type View = "home" | "deposit" | "shop" | "recharge" | "mb" | "saudi" | "history" | "ledger" | "pin";
+type View = "home" | "deposit" | "shop" | "recharge" | "mb" | "saudi" | "history" | "ledger" | "pin" | "mdrive" | "edrive" | "bill" | "namaz" | "adduser" | "myusers" | "rates";
 
-const TILES: { k: View; icon: string; label: string; cat?: string; tab?: "topup" | "drive" }[] = [
-  { k: "deposit", icon: "💰", label: "Add Money" },
-  { k: "recharge", icon: "📱", label: "BD Topup", tab: "topup" },
-  { k: "recharge", icon: "🌐", label: "Drive Offer", tab: "drive" },
-  { k: "mb", icon: "🏦", label: "Mobile Banking" },
-  { k: "saudi", icon: "🇸🇦", label: "Saudi Voucher" },
-  { k: "shop", icon: "🛍", label: "পণ্য" },
-  { k: "shop", icon: "🎫", label: "Calling Card", cat: "call" },
-  { k: "shop", icon: "🛡️", label: "VPN Cards", cat: "vpn" },
-  { k: "history", icon: "🧾", label: "My Card" },
-  { k: "ledger", icon: "📒", label: "Ledger" },
-  { k: "pin", icon: "🔐", label: "PIN" }
+type Need = "cards" | "req" | "top";
+const TILES: { k: View; icon: LucideIcon; label: string; cat?: string; tab?: "topup" | "drive"; need?: Need }[] = [
+  { k: "deposit", icon: Wallet, label: "Add Money" },
+  { k: "recharge", icon: Smartphone, label: "Topup", tab: "topup" },
+  { k: "recharge", icon: Wifi, label: "Drive offer", tab: "drive" },
+  { k: "mdrive", icon: Gift, label: "Manual drive", need: "req" },
+  { k: "edrive", icon: Sparkles, label: "E Drive", need: "req" },
+  { k: "mb", icon: Landmark, label: "M.Banking" },
+  { k: "shop", icon: Ticket, label: "Calling card", cat: "call", need: "cards" },
+  { k: "shop", icon: ShieldCheck, label: "VPN cards", cat: "vpn", need: "cards" },
+  { k: "adduser", icon: UserPlus, label: "Add User", need: "top" },
+  { k: "myusers", icon: Users2, label: "My Users", need: "top" },
+  { k: "bill", icon: FileText, label: "Bill Payment", need: "req" },
+  { k: "namaz", icon: Moon, label: "Namaz" },
+  { k: "saudi", icon: Banknote, label: "Saudi Voucher" },
+  { k: "shop", icon: CreditCard, label: "Global card", cat: "global", need: "cards" },
+  { k: "shop", icon: ShoppingBag, label: "Products", need: "cards" },
+  { k: "history", icon: Receipt, label: "My Card" },
+  { k: "ledger", icon: Clock, label: "Ledger" },
+  { k: "rates", icon: Percent, label: "My Commission" },
+  { k: "pin", icon: KeyRound, label: "PIN" }
 ];
 
 const card = "bg-white border border-border rounded-2xl p-4 mb-3";
@@ -62,7 +77,11 @@ const TYPE_BN: Record<string, string> = {
   Purchase: "পণ্য কেনা",
   "Recharge hold": "রিচার্জ (টাকা আটকানো)",
   Refund: "ফেরত",
-  "Admin payment": "অ্যাডমিন পেমেন্ট"
+  "Admin payment": "অ্যাডমিন পেমেন্ট",
+  "Transfer out": "ইউজারকে ট্রান্সফার",
+  "Transfer in": "ট্রান্সফার পেয়েছেন",
+  "Team commission": "টিম কমিশন",
+  "Reseller bonus": "রিসেলার বোনাস"
 };
 
 function StatusPill({ s }: { s: string }) {
@@ -177,6 +196,11 @@ export default function TelecomReseller() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [pinAsk, setPinAsk] = useState<{ title: string; lines: string[]; label: string; run: (pin: string) => Promise<void> } | null>(null);
   const [shopCat, setShopCat] = useState("all");
+  const [unlocked, setUnlockedS] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [more, setMore] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const navigate = useNavigate();
 
   // আবেদন ফর্ম
   // ডিপজিট
@@ -205,6 +229,7 @@ export default function TelecomReseller() {
     setLogged(true);
     const { data: r } = await supabase.from("telecom_resellers").select("*").eq("user_id", session.user.id).maybeSingle();
     setMe((r as TelReseller) ?? null);
+    if (r) setUnlockedS(isUnlocked((r as TelReseller).user_id));
     if (r && (r as TelReseller).status === "Approved") {
       const [w, d, p, k, o, rc, l, s, pm, ps, bk] = await Promise.all([
         supabase.from("telecom_wallets").select("currency,balance").eq("reseller_id", (r as TelReseller).id),
@@ -261,6 +286,7 @@ export default function TelecomReseller() {
   const shopCats = useMemo(() => Array.from(new Set(products.map((p) => (p.category ?? "").trim()).filter(Boolean))), [products]);
   const shownProducts = useMemo(() => {
     if (shopCat === "all") return products;
+    if (shopCat === "global") return products.filter((p) => /dollar|global|usd/i.test(`${p.category ?? ""} ${p.name}`));
     if (shopCat === "call" || shopCat === "vpn") {
       const key = shopCat === "call" ? "call" : "vpn";
       return products.filter((p) => `${p.category ?? ""} ${p.name}`.toLowerCase().includes(key));
@@ -328,6 +354,17 @@ export default function TelecomReseller() {
 
   if (!ready) return <div className="p-8 text-center text-mute text-sm">লোড হচ্ছে…</div>;
 
+  async function logout() {
+    if (me) persistUnlock(me.user_id, false);
+    setUnlockedS(false);
+    await supabase.auth.signOut();
+    navigate("/account");
+  }
+
+  if (helpOpen) {
+    return <HelpRequest defaultName={me?.name ?? ""} defaultMobile={me?.mobile ?? ""} defaultStore={me?.name ?? ""} onBack={() => setHelpOpen(false)} onToast={toast} />;
+  }
+
   const titleOf: Record<View, string> = {
     home: "J H Telecom Reseller",
     deposit: "Add Money",
@@ -337,7 +374,14 @@ export default function TelecomReseller() {
     saudi: "Saudi Voucher",
     history: "My Card / History",
     ledger: "Ledger",
-    pin: "PIN"
+    pin: "PIN",
+    mdrive: "Manual Drive",
+    edrive: "E Drive",
+    bill: "Bill Payment",
+    namaz: "Namaz",
+    adduser: "Add User",
+    myusers: "My Users",
+    rates: "My Commission"
   };
 
   const header = (
@@ -377,13 +421,23 @@ export default function TelecomReseller() {
 
   if (!logged) {
     return (
-      <div className="px-4 pt-4 pb-6">
-        {header}
-        <div className={card + " text-center"}>
-          <div className="text-sm mb-3">রিসেলার সেবা ব্যবহার করতে আগে লগইন করুন।</div>
-          <Link to="/account" className={btn + " inline-block"}>
-            লগইন / নতুন অ্যাকাউন্ট
-          </Link>
+      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#2b4797 0%,#3d62d6 46%,#f4f6fb 46%)" }}>
+        <div className="px-6 pt-14 pb-8 text-white text-center">
+          <div className="w-16 h-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-3">
+            <Lock size={28} />
+          </div>
+          <div className="text-xl font-extrabold">J H Telecom Reseller</div>
+          <div className="text-xs opacity-90 mt-1">এই অংশ দেখতে আগে লগইন করুন</div>
+        </div>
+        <div className="px-4 max-w-md w-full mx-auto">
+          <div className="bg-white rounded-3xl p-5 shadow-lg text-center">
+            <Link to="/account" className="press block rounded-2xl text-white font-extrabold py-3.5" style={{ background: "#2b4797" }}>
+              লগইন করুন
+            </Link>
+            <button className="press w-full text-sm font-bold mt-4" style={{ color: "#2b4797" }} onClick={() => setHelpOpen(true)}>
+              পাসওয়ার্ড / পিন ভুলে গেছেন? অ্যাডমিনকে জানান
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -423,10 +477,66 @@ export default function TelecomReseller() {
             {me.status === "Rejected" && "আপনার আবেদন গ্রহণ করা হয়নি। যোগাযোগ করুন।"}
             {me.status === "Suspended" && "আপনার রিসেলার অ্যাকাউন্ট সাময়িক বন্ধ আছে। যোগাযোগ করুন।"}
           </div>
+          <button className={btnGhost + " mt-4 w-full"} onClick={() => setHelpOpen(true)}>
+            অ্যাডমিনের সাথে যোগাযোগ
+          </button>
+          <button className="press mt-2 w-full text-xs text-mute font-semibold" onClick={logout}>
+            লগআউট
+          </button>
         </div>
       </div>
     );
   }
+
+  if (pinSet === false) return <SetPinScreen name={me.name} onDone={async () => { persistUnlock(me.user_id, true); setUnlockedS(true); await load(); }} onLogout={logout} />;
+  if (pinSet === true && !unlocked) return <LockScreen name={me.name} onUnlock={() => { persistUnlock(me.user_id, true); setUnlockedS(true); }} onHelp={() => setHelpOpen(true)} onLogout={logout} />;
+
+  const permOf = me.perm as Record<string, boolean | undefined>;
+  const visTiles = TILES.filter((t) => (t.need === "cards" ? permOf.Cards !== false : t.need === "req" ? permOf.Requests !== false : t.need === "top" ? !me.parent_id : true));
+  const shownTiles = more ? visTiles : visTiles.slice(0, 12);
+  const topBar = (
+    <div className={`text-white relative ${view === "home" ? "pb-14" : "pb-3"}`} style={{ background: "linear-gradient(135deg,#2b4797,#3d62d6)" }}>
+      <div className="px-4 pt-5 pb-1 flex items-center gap-3">
+        {view !== "home" ? (
+          <button className="press w-10 h-10 rounded-full bg-white/15 flex items-center justify-center" onClick={() => setView("home")} aria-label="পেছনে">
+            <ArrowLeft size={18} />
+          </button>
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-extrabold">{me.name.slice(0, 1).toUpperCase()}</div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="font-extrabold truncate">{view === "home" ? me.name : titleOf[view]}</div>
+          <div className="text-[11px] opacity-85 truncate">J H Telecom{me.parent_id ? " · ইউজার" : ""}</div>
+        </div>
+        <button className="press p-2" onClick={() => setHide(!hide)} aria-label="ব্যালেন্স দেখা/লুকানো">
+          {hide ? <EyeOff size={19} /> : <Eye size={19} />}
+        </button>
+        <button className="press p-2" onClick={() => setMenu(!menu)} aria-label="মেনু">
+          <Menu size={21} />
+        </button>
+      </div>
+      {menu && (
+        <div className="absolute right-3 top-16 z-30 bg-white text-ink rounded-2xl shadow-xl border border-border w-60 overflow-hidden text-sm font-semibold">
+          {[
+            { l: "🔒 এখনই লক করুন", f: () => { persistUnlock(me.user_id, false); setUnlockedS(false); } },
+            { l: "🔐 পিন বদলান", f: () => setView("pin") },
+            { l: "📊 আমার কমিশন", f: () => setView("rates") },
+            { l: "💬 অ্যাডমিনের সাথে যোগাযোগ", f: () => setHelpOpen(true) },
+            { l: "↩ লগআউট", f: logout }
+          ].map((m) => (
+            <button key={m.l} className="press w-full text-left px-4 py-3 border-b border-border last:border-0" onClick={() => { setMenu(false); m.f(); }}>
+              {m.l}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+  const navItems: { v: View; label: string; icon: LucideIcon }[] = [
+    { v: "home", label: "Home", icon: HomeIcon },
+    { v: "ledger", label: "History", icon: Clock },
+    { v: "history", label: "My card", icon: CreditCard }
+  ];
 
   const activePays = pays.filter((m) => me.perm?.[m.method as "bKash"]);
   const hasBank = banks.length > 0;
@@ -455,39 +565,50 @@ export default function TelecomReseller() {
       const d = deps.find((x) => x.id === id);
       return { text: d ? `${d.method} · TrxID ${d.trx_id}` : `${l.note} · ${ref}` };
     }
+    if (/^Q\d+$/.test(ref)) return { text: `সার্ভিস অনুরোধ ${ref} · ${l.note}` };
+    if (/^T[0-9a-f]+$/.test(ref)) return { text: `ট্রান্সফার · ${l.note}` };
     return { text: [l.note, ref].filter(Boolean).join(" · ") };
   }
 
   return (
-    <div className="px-4 pt-4 pb-8">
-      {header}
-
+    <div className="min-h-screen bg-[#f4f6fb] pb-28">
+      {topBar}
+      <div className="px-4 pt-4">
       {view === "home" && (
         <>
-          <div className="bg-teal-tint text-teal-dark rounded-full px-4 py-2.5 text-[12px] font-semibold mb-4 truncate">📢 {settings?.deposit_note?.trim() ? settings.deposit_note.split("\n")[0] : "J H Telecom: ডিপোজিট, রিচার্জ, সৌদি ভাউচার ও কার্ড এক জায়গায়"}</div>
-          <div className="grid grid-cols-4 gap-x-2 gap-y-4 mb-4">
-            {TILES.map((t) => (
-              <button
-                key={t.label}
-                onClick={() => {
-                  if (t.k === "shop") setShopCat(t.cat ?? "all");
-                  if (t.k === "recharge") setRTab(t.tab ?? "topup");
-                  setView(t.k);
-                }}
-                className="press flex flex-col items-center gap-1.5"
-              >
-                <span className="w-14 h-14 rounded-2xl bg-teal-tint flex items-center justify-center text-2xl">{t.icon}</span>
-                <span className="text-[11px] font-semibold text-ink leading-tight text-center">{t.label}</span>
-              </button>
+          <div className="-mt-12 mb-4 bg-white rounded-2xl shadow-md border border-border p-4 grid grid-cols-2 gap-3">
+            {(["BDT", "SAR"] as Cur[]).map((c) => (
+              <div key={c}>
+                <div className="text-[11px] font-bold text-mute">{c === "BDT" ? "Current Balance" : "SAR Balance"}</div>
+                <div className="text-xl font-extrabold text-ink">{hide ? "••••" : money(c, bal[c])}</div>
+              </div>
             ))}
           </div>
-          {pinSet === false && (
-            <div className="bg-orange-tint rounded-2xl p-3 text-xs mb-3 flex items-center justify-between gap-2">
-              <span>🔐 কেনার আগে একটি পিন সেট করুন।</span>
-              <button className={btn} onClick={() => setView("pin")}>
-                পিন সেট
-              </button>
-            </div>
+          <div className="bg-teal-tint text-teal-dark rounded-full px-4 py-2.5 text-[12px] font-semibold mb-4 truncate">📢 {settings?.deposit_note?.trim() ? settings.deposit_note.split("\n")[0] : "J H Telecom: ডিপোজিট, রিচার্জ, সৌদি ভাউচার ও কার্ড এক জায়গায়"}</div>
+          <div className="text-center font-extrabold text-lg mb-3">Recharge, Drive &amp; more</div>
+          <div className="grid grid-cols-4 gap-x-1 gap-y-5 mb-2">
+            {shownTiles.map((t) => {
+              const Ic = t.icon;
+              return (
+                <button
+                  key={t.label}
+                  onClick={() => {
+                    if (t.k === "shop") setShopCat(t.cat ?? "all");
+                    if (t.k === "recharge") setRTab(t.tab ?? "topup");
+                    setView(t.k);
+                  }}
+                  className="press flex flex-col items-center gap-1.5"
+                >
+                  <Ic size={36} strokeWidth={1.5} color="#2b4797" />
+                  <span className="text-[11px] font-semibold text-ink leading-tight text-center">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {visTiles.length > 12 && (
+            <button className="press block mx-auto mb-4 text-sm font-bold" style={{ color: "#2b4797" }} onClick={() => setMore(!more)}>
+              {more ? "See Less" : "See More"}
+            </button>
           )}
           <div className="rounded-2xl p-5 text-white mb-3 bg-gradient-to-br from-[#1c2f78] to-[#3d62d6]">
             <div className="font-extrabold text-lg">J H Telecom</div>
@@ -515,6 +636,14 @@ export default function TelecomReseller() {
           </div>
         </>
       )}
+
+      {view === "mdrive" && <ServiceRequest kind="manual_drive" bal={bal.BDT} pinSet={pinSet} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
+      {view === "edrive" && <ServiceRequest kind="e_drive" bal={bal.BDT} pinSet={pinSet} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
+      {view === "bill" && <ServiceRequest kind="bill_payment" bal={bal.BDT} pinSet={pinSet} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
+      {view === "namaz" && <Namaz />}
+      {view === "adduser" && <AddUser pinSet={pinSet} ownPerm={permOf as Record<string, boolean>} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
+      {view === "myusers" && <MyUsers pinSet={pinSet} ownPerm={permOf as Record<string, boolean>} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />}
+      {view === "rates" && <MyRates />}
 
       {view === "saudi" && (
         <SaudiShop resellerId={me.id} bal={bal} pinSet={pinSet} whatsapp={waNum} onChanged={load} onToast={toast} onNeedPin={() => setView("pin")} />
@@ -865,6 +994,19 @@ export default function TelecomReseller() {
 
       {receipt && <TelecomReceipt data={receipt} onClose={() => setReceipt(null)} onToast={toast} />}
       {pinAsk && <PinSheet title={pinAsk.title} lines={pinAsk.lines} label={pinAsk.label} onSubmit={pinAsk.run} onClose={() => setPinAsk(null)} />}
+      </div>
+      <nav className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-border flex justify-around pt-2 pb-5">
+        {navItems.map((n) => {
+          const Ic = n.icon;
+          const on = view === n.v;
+          return (
+            <button key={n.label} className="press flex flex-col items-center gap-0.5 px-6 py-1" style={{ color: on ? "#2b4797" : "#8a94a8" }} onClick={() => setView(n.v)}>
+              <Ic size={26} strokeWidth={on ? 2.2 : 1.7} />
+              <span className="text-[12px] font-bold">{n.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

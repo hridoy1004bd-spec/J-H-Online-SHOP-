@@ -9,7 +9,8 @@ export interface TelReseller {
   country: string;
   mobile: string;
   status: "Pending" | "Approved" | "Rejected" | "Suspended";
-  perm: { bKash?: boolean; Nagad?: boolean; Rocket?: boolean; Bangladesh?: boolean };
+  perm: { bKash?: boolean; Nagad?: boolean; Rocket?: boolean; Bangladesh?: boolean; Cards?: boolean; Requests?: boolean };
+  parent_id?: string | null;
   created_at: string;
 }
 export interface TelDeposit {

@@ -6,6 +6,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { uploadService } from "../../services/uploadService";
 import AdminTelecomSaudi from "../../components/AdminTelecomSaudi";
 import AdminTelecomMb from "../../components/AdminTelecomMb";
+import AdminTelecomRequests from "../../components/AdminTelecomRequests";
 import { signedProofUrl } from "../../services/bdService";
 import {
   Cur,
@@ -30,13 +31,14 @@ import {
   toMinor
 } from "../../services/telecomService";
 
-type Tab = "o" | "r" | "d" | "q" | "mb" | "sa" | "b" | "p" | "s" | "l";
+type Tab = "o" | "r" | "d" | "q" | "mb" | "rq" | "sa" | "b" | "p" | "s" | "l";
 const TABS: { k: Tab; label: string }[] = [
   { k: "o", label: "📊 ওভারভিউ" },
   { k: "r", label: "👤 রিসেলার" },
   { k: "d", label: "💰 ডিপজিট" },
   { k: "q", label: "📲 রিচার্জ" },
   { k: "mb", label: "🏦 মোবাইল ব্যাংকিং" },
+  { k: "rq", label: "🧾 ড্রাইভ/বিল" },
   { k: "sa", label: "🇸🇦 সৌদি" },
   { k: "b", label: "🛒 বিক্রি" },
   { k: "p", label: "🛍 পণ্য" },
@@ -330,6 +332,8 @@ export default function AdminTelecom() {
       </div>
 
       {tab === "mb" && <AdminTelecomMb resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
+
+      {tab === "rq" && <AdminTelecomRequests resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
 
       {tab === "sa" && <AdminTelecomSaudi resellers={resellers.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile }))} />}
 
